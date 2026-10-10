@@ -29,6 +29,7 @@ ENUM_VARS = ("presence", "q_kind", "id_reply", "reply", "applies_to_all", "custo
 # the builder's own words, not a brief's: said while waiting for the rest of a cut-off message, and after a failed save
 GO_ON = "Go on."
 RETRIED_OK = "That didn't go through the first time, but I've tried again and it is now recorded."
+ONE_AT_A_TIME = "Let's take them one at a time."
 NOT_SAVED_FINAL = "Just to be clear, this has not been saved."
 
 
@@ -1287,6 +1288,9 @@ def agree(S, V, st, p, amount, date_iso, today):
     p["date"] = date_iso
     p["status"] = "agreed"
     p["offer"] = None
+    if st.get("stage") == "ask_today" and len(st.get("products") or []) > 1 and open_products(st):
+        # one product settled in answer to the shared question: the others now go one at a time
+        return next_product(S, V, st, today, ONE_AT_A_TIME)
     return next_product(S, V, st, today)
 
 
@@ -1672,6 +1676,9 @@ def refusal(S, V, st, p, today):
             x["refused"] = (x.get("refused") or []) + [[x["due"], today.isoformat()]]
         p = current(st)
         p["entered"] = True
+        if len(open_products(st)) > 1:
+            # the shared question is over: say so, so that the first offer reads as each product's own first attempt
+            return attempt_offer(S, V, st, p, today, ONE_AT_A_TIME)
     return attempt_offer(S, V, st, p, today)
 
 
