@@ -56,6 +56,10 @@ VARIANTS = {
     "PUB-01b": ("PUB-01", [{"presence": "unclear"}, {"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "the fourteenth of March"},
                            {"id_reply": "answer", "id_answer": "nineteen eighty-eight"}, {"id_reply": "answer", "id_answer": "four four"}, {"id_reply": "answer", "id_answer": "seven one"},
                            {"reply": "question", "q_kind": "scam"}, {"reply": "yes"}, {"reply": "yes"}]),
+    "PUB-04b": ("PUB-04", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "30 January 1984"}, {"id_reply": "answer", "id_answer": "2219"},
+                           {"reply": "propose", "date_phrase": "the sixth of November"}, {"reply": "yes", "date_phrase": "on that", "q_kind": "ai"}, {"reply": "yes"}]),
+    "PUB-05c": ("PUB-05", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "9 September 1990"}, {"id_reply": "answer", "id_answer": "8846"},
+                           {"reply": "hardship", "q_kind": "other"}, {"reply": "restructuring"}]),
     "PUB-02b": ("PUB-02", [{"presence": "other_person", "cb_phrase": "she is back tomorrow, call around eleven"}]),
 }
 for k, (base, turns) in VARIANTS.items():

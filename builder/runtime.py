@@ -1215,6 +1215,9 @@ def on_main_turn(S, V, st, now):
     d, dkind = parse_day_phrase(S, dphrase, today) if dphrase else (None, "none")
     proposes = d is not None or amount is not None
 
+    # while the hardship transfer is offered, only a clear yes transfers; everything else declines it
+    if stage == "hardship_offer" and reply in ("restructuring", "human", "question", "other", "no", "not_talking", "too_much"):
+        reply = "no"
     # requests that end or redirect the call come first
     if reply == "restructuring" and (rq.get("restructuring") or {}).get("enabled", True) and queue_for(S, "restructuring"):
         for x in prods:
@@ -1426,6 +1429,8 @@ def run(V, S):
     pend = st.get("pending") or ""
     phase = st.get("phase")
     today = now.date()
+    asked = sval(V, "q_kind") if not pend.startswith("tool:") else ""
+    answer = answer_for_question(S, asked) if asked in ("ai", "scam") else ""
     if pend == "tool:verify_identity":
         on_verify_result(S, V, st)
     elif pend == "tool:get_account":
@@ -1458,5 +1463,14 @@ def run(V, S):
         finish(S, V, st, "")
     if st.get("lead") and V.get("next_step") == "bye":
         V["farewell"] = join(st.pop("lead"), V.get("farewell", ""))
+    if answer:
+        if str(V.get("next_step") or "").endswith("_fixed") and answer not in (V.get("say_line") or ""):
+            say(V, st, V["next_step"][:-len("_fixed")], answer, V.get("say_line") or "")
+        elif V.get("next_step") == "bye" and answer not in (V.get("farewell") or ""):
+            V["farewell"] = join(answer, V.get("farewell") or "")
+        else:
+            st["answer_pending"] = answer
+    elif st.get("answer_pending") and str(V.get("next_step") or "").endswith("_fixed"):
+        say(V, st, V["next_step"][:-len("_fixed")], st.pop("answer_pending"), V.get("say_line") or "")
     set_final(S, V, st)
     save(V, st)
