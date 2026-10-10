@@ -117,6 +117,38 @@ git rev-parse HEAD        # the commit we submit
 
 Then fill `docs/submission-template.json` (copy it to `submission/submission.json`) and send the form.
 
+### Hand-in checklist
+
+Fill these in before Sunday; they are not known yet:
+
+| Item | Value |
+|---|---|
+| Team name | `<TEAM NAME>` |
+| Where to submit | `<SUBMISSION URL OR ADDRESS>` |
+| Deadline | `<DATE AND TIME>` |
+
+1. Scan the whole history for keys once more (prints counts only, never a value):
+
+```bash
+source env.sh
+git log -p --all > /tmp/history.txt
+grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9_-]{6,}|sk-or-[A-Za-z0-9_-]{6,}|Bearer [A-Za-z0-9._-]{10,}" /tmp/history.txt   # must be 0
+for v in FREYA_API_KEY FREYA_BANK_TEAM_KEY ANTHROPIC_API_KEY; do echo "$v: $(grep -F -c -- "${!v}" /tmp/history.txt)"; done   # all 0 (bash; in zsh use ${(P)v})
+git log --all --name-only --format= | grep -E '(^|/)(env\.sh|\.env)$'                                                           # must print nothing
+rm /tmp/history.txt
+```
+
+   If anything is found: do not make the repo public. Rotate the key first, then rewrite the history.
+
+2. Make the repository public: GitHub, `selvataas/freya_hackhathon`, Settings, General, Danger Zone, Change visibility,
+   Public. Or `gh repo edit selvataas/freya_hackhathon --visibility public --accept-visibility-change-consequences`.
+3. Open the repository in a private browser window to check it can be read without a login.
+4. Fill `submission/submission.json` from the template: team name, repository URL, the commit (`git rev-parse HEAD`), and
+   per brief the slot, workflow id, agent id and the paths of the export, the trace and the build log.
+5. Submit at the address above: the repository URL with the commit, the two `submission/<slot>.workflow.json`, the two
+   traces, and the form.
+6. After submitting: no more pushes to the submitted commit's branch until the organisers confirm receipt.
+
 ## 5. If something goes wrong
 
 | What | Do |
