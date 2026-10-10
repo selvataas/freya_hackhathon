@@ -5,3 +5,6 @@ results/
 .personas.json
 .venv/
 cache/
+out/
+traces/
+.freya-agents.json
