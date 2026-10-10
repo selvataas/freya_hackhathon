@@ -36,7 +36,7 @@ SCRIPTS = {
     "PUB-09": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "11 August 1981"}, {"id_reply": "answer", "id_answer": "5560"},
                {"reply": "restructuring"}],
     "PUB-10": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "23 February 1989"}, {"id_reply": "answer", "id_answer": "9904"},
-               {"reply": "no"}, {"reply": "yes"}, {"reply": "yes"}, {"reply": "other"}],
+               {"reply": "no"}, {"reply": "yes"}, {"reply": "yes"}],
     "PUB-11": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "3 June 1987"}, {"id_reply": "answer", "id_answer": "2288"},
                {"reply": "propose", "date_phrase": "this Friday", "applies_to_all": "yes"}, {"reply": "yes"}],
     "PUB-12": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "19 October 1983"}, {"id_reply": "answer", "id_answer": "4401"},
@@ -87,10 +87,10 @@ VARIANTS.update({
                         {"id_reply": "answer", "id_answer": "one nine"}, {"reply": "propose", "date_phrase": "the sixth of November", "amount": "one thousand two hundred and fifty"},
                         {"reply": "yes"}, {"reply": "yes"}]),
     "R-10": ("PUB-10", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "23.02.1989"}, {"id_reply": "answer", "id_answer": "nine nine oh four"},
-                        {"reply": "no", "q_kind": "other"}, {"reply": "yes", "q_kind": "ai"}, {"reply": "yes"}, {"reply": "yes"}]),
+                        {"reply": "no", "q_kind": "other"}, {"reply": "yes", "q_kind": "ai"}, {"reply": "yes"}]),
     "R-10w": ("PUB-10", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "the twenty-third of February one nine eight nine", "id_iso": "1989-02-23"},
                          {"id_reply": "answer", "id_answer": "nine nine"}, {"id_reply": "answer", "id_answer": "zero four"},
-                         {"reply": "no"}, {"reply": "yes"}, {"reply": "yes"}, {"reply": "other"}]),
+                         {"reply": "no"}, {"reply": "yes"}, {"reply": "yes"}]),
     "R-07f": ("PUB-07", [{"presence": "unclear"}, {"presence": "confirmed"},
                          {"id_reply": "answer", "id_answer": "the fifth of December nineteen seventy-five"},
                          {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "answer", "id_answer": "seven zero nine three"},
@@ -108,6 +108,15 @@ VARIANTS.update({
                            {"reply": "propose", "date_phrase": "Monday the twenty", "message_state": "cut_off"}, {"reply": "propose", "date_phrase": "sixth"},
                            {"reply": "yes"}, {"reply": "yes"}]),
     "R-frag3": ("PUB-02", [{"presence": "other_person", "cb_phrase": "she can be reached tomorrow", "message_state": "cut_off"}, {"presence": "other_person", "cb_phrase": "at eleven"}]),
+    "R-short": ("PUB-06", [{"presence": "confirmed", "message_state": "complete"}, {"id_reply": "answer", "id_answer": "17/05/1986", "message_state": "complete"},
+                           {"id_reply": "answer", "id_answer": "1502", "message_state": "complete"}, {"reply": "too_much", "message_state": "complete"},
+                           {"reply": "propose", "date_phrase": "friday", "message_state": "complete"}, {"reply": "yes", "message_state": "complete"}]),
+    "R-shortx": ("PUB-06", [{"presence": "confirmed", "message_state": "cut_off"}, {"id_reply": "answer", "id_answer": "17/05/1986", "message_state": "cut_off"},
+                            {"id_reply": "answer", "id_answer": "1502", "message_state": "cut_off"}, {"reply": "too_much", "message_state": "cut_off"},
+                            {"reply": "propose", "date_phrase": "friday", "message_state": "cut_off"}, {"reply": "yes", "message_state": "cut_off"}]),
+    "R-shortn": ("PUB-05", [{"presence": "confirmed", "message_state": "cut_off"}, {"id_reply": "answer", "id_answer": "9 September 1990", "message_state": "cut_off"},
+                            {"id_reply": "answer", "id_answer": "8846", "message_state": "cut_off"}, {"reply": "hardship", "message_state": "cut_off"},
+                            {"reply": "no", "message_state": "cut_off"}]),
     "R-13": ("PUB-13", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "eighth of January nineteen ninety-one"}, {"id_reply": "answer", "id_answer": "6604"},
                         {"reply": "propose", "date_phrase": "the thirtieth of October", "applies_to_all": "yes"}, {"reply": "question", "q_kind": "other"}, {"reply": "yes"}]),
 })
@@ -241,6 +250,8 @@ def run_case(spec, cid, verbose=False):
     case = CASES[cid]
     bank, V, log, script = simulate(spec, case, SCRIPTS[cid])
     problems = compare(bank, case["expected"])
+    if cid.startswith("R-short") and any(who == "AGENT" and text.strip() == runtime.GO_ON for who, text in log):
+        problems.append("'Go on.' after a short complete answer")
     if script:
         problems.append(f"{len(script)} scripted turns left unused")
     st = json.loads(V.get("st") or "{}")

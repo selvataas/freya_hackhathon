@@ -28,8 +28,7 @@ EMPTY = "none"
 ENUM_VARS = ("presence", "q_kind", "id_reply", "reply", "applies_to_all", "custom", "message_state")
 # the builder's own words, not a brief's: said while waiting for the rest of a cut-off message, and after a failed save
 GO_ON = "Go on."
-NOT_SAVED = "Just to be clear, this has not been saved yet."
-TRY_AGAIN = "I will try once more now."
+RETRIED_OK = "That didn't go through the first time, but I've tried again and it is now recorded."
 NOT_SAVED_FINAL = "Just to be clear, this has not been saved."
 
 
@@ -1297,11 +1296,8 @@ def on_promise_result(S, V, st, today):
         p["unknown"] = True
     p["retries"] = int(p.get("retries") or 0) + 1
     if p["retries"] <= int((S.get("promise") or {}).get("retries") or 1):
-        if d is not None and not p.get("told_unsaved"):
-            # the bank answered with a failure: say so plainly before trying again
-            p["told_unsaved"] = True
-            st["stage"] = "retry_wait"
-            return say(V, st, "talk_main", NOT_SAVED, TRY_AGAIN)
+        # try again at once, in the same turn: the tool node goes straight to the tool node
+        p["had_failure"] = True
         return call_tool(S, V, st, "create_promise", {"product_id": p["id"], "amount": p["amount"], "date": p["date"]})
     p["status"] = "failed"
     p["note_sit"] = "service_error"
@@ -1344,12 +1340,18 @@ def closing_words(S, V, st, today):
     failed = [p for p in prods if p.get("status") == "failed"]
     lines = [st.pop("lead", "") or ""]
     if rec:
-        items = [phrase(S, "promise_item", amount=fmt_amount(p["amount"]), product=p["spoken"], when=when_words(S, p["date"], today)) for p in rec]
-        lines.append(phrase(S, "recorded", items="; ".join(items)))
+        retried = [p for p in rec if p.get("had_failure")]
+        plain = [p for p in rec if not p.get("had_failure")]
+        if plain or len(rec) > 1:
+            items = [phrase(S, "promise_item", amount=fmt_amount(p["amount"]), product=p["spoken"], when=when_words(S, p["date"], today)) for p in (plain if retried else rec)]
+            if items:
+                lines.append(phrase(S, "recorded", items="; ".join(items)))
+        if retried:
+            lines.append(RETRIED_OK)
         lines.append(phrase(S, "after_promise"))
     if failed:
-        lines.append(phrase(S, "service_error", product=", ".join(p["spoken"] for p in failed)))
         lines.append(NOT_SAVED_FINAL)
+        lines.append(phrase(S, "service_error", product=", ".join(p["spoken"] for p in failed)))
     return finish(S, V, st, st.get("situation") or "", *lines)
 
 
@@ -1369,14 +1371,6 @@ def on_main_turn(S, V, st, now):
     allp = sval(V, "applies_to_all")
     q = sval(V, "q_kind")
     consume(V, ("reply", "date_phrase", "amount", "applies_to_all", "q_kind"))
-    if stage_is(st, "retry_wait"):
-        # the customer answered the 'not saved yet' line: try the save again
-        st["stage"] = "confirm"
-        pid = st.get("recording")
-        for x in st.get("products") or []:
-            if x.get("id") == pid:
-                return call_tool(S, V, st, "create_promise", {"product_id": x["id"], "amount": x["amount"], "date": x["date"]})
-        return record_next(S, V, st, now.date())
     frag_d, frag_a = st.pop("frag_date", ""), st.pop("frag_amount", "")
     if frag_d and dphrase:
         both = join(frag_d, dphrase)
