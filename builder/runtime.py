@@ -1371,13 +1371,15 @@ def on_main_turn(S, V, st, now):
     allp = sval(V, "applies_to_all")
     q = sval(V, "q_kind")
     consume(V, ("reply", "date_phrase", "amount", "applies_to_all", "q_kind"))
-    frag_d, frag_a = st.pop("frag_date", ""), st.pop("frag_amount", "")
+    frag_d, frag_a, frag_r = st.pop("frag_date", ""), st.pop("frag_amount", ""), st.pop("frag_reply", "")
     if frag_d and dphrase:
         both = join(frag_d, dphrase)
         if parse_day_phrase(S, both, today)[0] is not None:
             dphrase = both
-    elif frag_d and not dphrase:
+    elif frag_d and not dphrase and not dangling_date(frag_d):
         dphrase = frag_d
+    if frag_r in ("yes", "no") and reply in ("", "other") and not dphrase:
+        reply = frag_r  # the cut-off message said yes or no before the date words broke off
     raw_amount = sval(V, "_amount_raw")
     if frag_a and amount is not None:
         a2 = to_float(join(frag_a, raw_amount))
@@ -1393,12 +1395,12 @@ def on_main_turn(S, V, st, now):
     proposes = d is not None or amount is not None
     if st.get("_cut") and not q and reply in ("", "other", "vague", "propose", "yes", "no"):
         # a cut-off message: keep its date and amount words and wait for the rest, unless it already says enough
-        last = (re.findall(r"[a-z]+|\d+", dphrase.lower()) or [""])[-1]
-        dangling = last in TENS or last in ("the", "of", "on", "and", "at", "in", "next", "this")
-        complete_date = d is not None and dkind == "date" and not dangling
+        complete_date = d is not None and dkind == "date" and not dangling_date(dphrase)
         if not complete_date and not (reply in ("yes", "no") and not dphrase and amount is None):
             if dphrase:
                 st["frag_date"] = dphrase
+            if reply in ("yes", "no"):
+                st["frag_reply"] = reply
             if raw_amount:
                 st["frag_amount"] = raw_amount
             if go_on(V, st, "talk_main"):
@@ -1478,6 +1480,8 @@ def on_main_turn(S, V, st, now):
         return repeat_last(V, st, "talk_main", phrase(S, "changes_after_record"))
 
     # the read-back
+    if stage == "confirm" and (reply not in ("", "other") or proposes):
+        st["confirm_unclear"] = 0
     if stage == "confirm":
         if reply == "yes" and not proposes:
             for x in prods:
@@ -1503,8 +1507,10 @@ def on_main_turn(S, V, st, now):
                 return readback(S, V, st, today)
             st["stage"] = "offer"
             return attempt_offer(S, V, st, p, today)
+        elif q:
+            return repeat_last(V, st, "talk_main", answer_for_question(S, q) or phrase(S, "no_info"))
         else:
-            return repeat_last(V, st, "talk_main", answer_for_question(S, q))
+            return confirm_unclear(S, V, st, prods, today)
 
     if p is None:
         return readback(S, V, st, today)
@@ -1587,9 +1593,24 @@ def on_main_turn(S, V, st, now):
     if st["main_unclear"] == 2:
         return repeat_last(V, st, "talk_main", phrase(S, "not_understood"))
     st["main_unclear"] = 0
-    if st.get("stage") == "confirm":
-        return repeat_last(V, st, "talk_main", phrase(S, "not_understood"))
     return refusal(S, V, st, p, today)
+
+
+def confirm_unclear(S, V, st, prods, today):
+    """The read-back got no clear answer. Up to UNCLEAR_LIMIT times it is read again (every second time with the
+    spec's 'not understood'); then it is not confirmed, as a no would be, and the spec's attempts decide."""
+    st["confirm_unclear"] = int(st.get("confirm_unclear") or 0) + 1
+    if st["confirm_unclear"] <= UNCLEAR_LIMIT:
+        return repeat_last(V, st, "talk_main", phrase(S, "not_understood") if st["confirm_unclear"] % 2 == 0 else "")
+    st["confirm_unclear"] = 0
+    for x in [x for x in prods if x.get("status") == "agreed"]:
+        x["status"] = "open"
+        x["refused"] = (x.get("refused") or []) + [[x["amount"], x["date"]]]
+    p = current(st)
+    if p is None:
+        return readback(S, V, st, today)
+    st["stage"] = "offer"
+    return attempt_offer(S, V, st, p, today)
 
 
 def refusal(S, V, st, p, today):
@@ -1618,6 +1639,12 @@ def brain(V, S):
             pass
         V["instruction"] = "Apologise briefly and repeat your last question."
         V["next_step"] = "talk_main_llm" if (load_state(V) or {}).get("phase") == "main" else "talk_pre_llm"
+
+
+def dangling_date(text):
+    """Date words that stop where more must follow: 'Tuesday the twenty', 'on the', 'next'."""
+    last = (re.findall(r"[a-z]+|\d+", (text or "").lower()) or [""])[-1]
+    return last in TENS or last in ("the", "of", "on", "and", "at", "in", "next", "this")
 
 
 def stage_is(st, name):

@@ -123,6 +123,13 @@ VARIANTS.update({
                          {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "unclear"},
                          {"id_reply": "answer", "id_answer": "seven zero nine three"},
                          {"reply": "no"}, {"reply": "propose", "date_phrase": "Monday the 26th"}, {"reply": "yes"}, {"reply": "yes"}]),
+    "R-07y": ("PUB-07", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "5 December 1975"}, {"id_reply": "answer", "id_answer": "7093"},
+                         {"reply": "no"}, {"reply": "propose", "date_phrase": "Monday the twenty-sixth"},
+                         {"reply": "yes", "date_phrase": "Tuesday the twenty", "message_state": "cut_off"}, {"reply": "other"},
+                         {"reply": "yes"}]),
+    "R-07z": ("PUB-07", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "5 December 1975"}, {"id_reply": "answer", "id_answer": "7093"},
+                         {"reply": "no"}, {"reply": "propose", "date_phrase": "Monday the twenty-sixth"}, {"reply": "yes"},
+                         {"reply": "other"}, {"reply": "other", "message_state": "cut_off"}, {"reply": "other"}, {"reply": "other"}, {"reply": "other"}, {"reply": "other"}]),
     "R-13": ("PUB-13", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "eighth of January nineteen ninety-one"}, {"id_reply": "answer", "id_answer": "6604"},
                         {"reply": "propose", "date_phrase": "the thirtieth of October", "applies_to_all": "yes"}, {"reply": "question", "q_kind": "other"}, {"reply": "yes"}]),
 })
@@ -138,6 +145,9 @@ if "PUB-03" in CASES:
     CASES["R-03u"] = dict(CASES["PUB-03"], id="R-03u", expected=dict(CASES["PUB-03"]["expected"], outcome="not_reached", reason="unclear"))
     # unclear answers do not add up with refusals: two clear refusals decline, whatever came before
     CASES["R-03r"] = dict(CASES["PUB-03"], id="R-03r", expected=dict(CASES["PUB-03"]["expected"], reason="declined"))
+if "PUB-07" in CASES:
+    # the read-back never gets a clear yes: not confirmed, the early band has no attempt left -> refused, nothing recorded
+    CASES["R-07z"] = dict(CASES["PUB-07"], id="R-07z", expected=dict(CASES["PUB-07"]["expected"], outcome="no_promise", reason="refused", promises=[]))
 # PUB-06c: the floor on Friday is refused, attempt 2 of the late band offers the floor on the deadline
 if "PUB-06" in CASES:
     CASES["PUB-06c"] = dict(CASES["PUB-06"], id="PUB-06c", expected=dict(CASES["PUB-06"]["expected"], promises=[{"product_id": "p1", "amount": 637.5, "date": "2026-10-23"}]))
@@ -259,6 +269,8 @@ def run_case(spec, cid, verbose=False):
     case = CASES[cid]
     bank, V, log, script = simulate(spec, case, SCRIPTS[cid])
     problems = compare(bank, case["expected"])
+    if cid in ("R-07z",) and not (log and log[-1][1].startswith("[bye]")):
+        problems.append("the call did not end with the agent's own goodbye")
     if cid.startswith("R-short") and any(who == "AGENT" and text.strip() == runtime.GO_ON for who, text in log):
         problems.append("'Go on.' after a short complete answer")
     if script:
