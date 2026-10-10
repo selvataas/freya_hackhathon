@@ -996,21 +996,21 @@ def simple_question(q):
     return "Just that, please: " + (q.get("ask_text") or "")
 
 
+UNCLEAR_LIMIT = 4  # the builder's own limit: unclear or off-topic answers in the identity step before the call closes
+
+
 def unclear_identity(S, V, st):
-    """1st time: a simpler question. 2nd: the spec's 'not understood' and the question. Then it counts as a refusal."""
+    """Unclear or off-topic is never a refusal. The question is asked again, alternating a simpler form and the
+    spec's own words. After UNCLEAR_LIMIT unclear answers in a row the call closes as the spec's 'unclear'."""
     qs = questions(S)
     i = int(st.get("q_index") or 0)
     st["id_unclear"] = int(st.get("id_unclear") or 0) + 1
-    if st["id_unclear"] == 1 and i < len(qs):
-        st["id_partial"] = ""
+    if st["id_unclear"] > UNCLEAR_LIMIT:
+        return finish(S, V, st, "unclear")
+    st["id_partial"] = ""
+    if st["id_unclear"] % 2 == 1 and i < len(qs):
         return say(V, st, "talk_id", simple_question(qs[i]))
-    if st["id_unclear"] == 2:
-        return ask_question(S, V, st, phrase(S, "not_understood"))
-    st["id_unclear"] = 0
-    st["refusals"] = int(st.get("refusals") or 0) + 1
-    if st["refusals"] >= int((S.get("identity") or {}).get("max_refusals") or 2):
-        return finish(S, V, st, "id_declined")
-    return ask_question(S, V, st, phrase(S, "decline_explain"))
+    return ask_question(S, V, st, phrase(S, "not_understood"))
 
 
 def ask_question(S, V, st, *prefix):

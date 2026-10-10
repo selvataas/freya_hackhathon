@@ -96,7 +96,7 @@ VARIANTS.update({
                          {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "answer", "id_answer": "seven zero nine three"},
                          {"reply": "other"}, {"reply": "no"}, {"reply": "vague"}, {"reply": "propose", "date_phrase": "Monday the 26th"}, {"reply": "yes"}, {"reply": "yes"}]),
     "R-03u": ("PUB-03", [{"presence": "confirmed"}, {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "unclear"},
-                         {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "unclear"}]),
+                         {"id_reply": "unclear"}, {"id_reply": "unclear"}]),
     "R-frag1": ("PUB-01", [{"presence": "unclear", "message_state": "cut_off"}, {"presence": "confirmed"},
                            {"id_reply": "answer", "id_answer": "the fourteenth of", "message_state": "cut_off"}, {"id_reply": "answer", "id_answer": "March nineteen eighty-eight"},
                            {"id_reply": "unclear", "message_state": "cut_off"}, {"id_reply": "answer", "id_answer": "four four", "message_state": "cut_off"},
@@ -117,6 +117,12 @@ VARIANTS.update({
     "R-shortn": ("PUB-05", [{"presence": "confirmed", "message_state": "cut_off"}, {"id_reply": "answer", "id_answer": "9 September 1990", "message_state": "cut_off"},
                             {"id_reply": "answer", "id_answer": "8846", "message_state": "cut_off"}, {"reply": "hardship", "message_state": "cut_off"},
                             {"reply": "no", "message_state": "cut_off"}]),
+    "R-03r": ("PUB-03", [{"presence": "confirmed"}, {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "unclear"},
+                         {"id_reply": "refuse"}, {"id_reply": "refuse"}]),
+    "R-07t": ("PUB-07", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "5 December 1975"},
+                         {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "unclear"},
+                         {"id_reply": "answer", "id_answer": "seven zero nine three"},
+                         {"reply": "no"}, {"reply": "propose", "date_phrase": "Monday the 26th"}, {"reply": "yes"}, {"reply": "yes"}]),
     "R-13": ("PUB-13", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "eighth of January nineteen ninety-one"}, {"id_reply": "answer", "id_answer": "6604"},
                         {"reply": "propose", "date_phrase": "the thirtieth of October", "applies_to_all": "yes"}, {"reply": "question", "q_kind": "other"}, {"reply": "yes"}]),
 })
@@ -128,7 +134,10 @@ if "PUB-01" in CASES:
     CASES["PUB-01t"] = dict(CASES["PUB-01"], id="PUB-01t", timeout_first=True)
     SCRIPTS["PUB-01t"] = SCRIPTS["PUB-01"]
 if "PUB-03" in CASES:
-    CASES["R-03u"] = dict(CASES["PUB-03"], id="R-03u", expected=dict(CASES["PUB-03"]["expected"], reason="declined"))
+    # five unclear answers: never a refusal; after the limit of four the call closes as the spec's 'unclear'
+    CASES["R-03u"] = dict(CASES["PUB-03"], id="R-03u", expected=dict(CASES["PUB-03"]["expected"], outcome="not_reached", reason="unclear"))
+    # unclear answers do not add up with refusals: two clear refusals decline, whatever came before
+    CASES["R-03r"] = dict(CASES["PUB-03"], id="R-03r", expected=dict(CASES["PUB-03"]["expected"], reason="declined"))
 # PUB-06c: the floor on Friday is refused, attempt 2 of the late band offers the floor on the deadline
 if "PUB-06" in CASES:
     CASES["PUB-06c"] = dict(CASES["PUB-06"], id="PUB-06c", expected=dict(CASES["PUB-06"]["expected"], promises=[{"product_id": "p1", "amount": 637.5, "date": "2026-10-23"}]))
