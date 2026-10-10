@@ -143,6 +143,11 @@ for k, (base, turns) in VARIANTS.items():
     if base in CASES:
         CASES[k] = dict(CASES[base], id=k)
         SCRIPTS[k] = turns
+# the same customers against an API that answers in loose types (see Bank._noisy)
+for _base in ("PUB-01", "PUB-03", "PUB-04", "PUB-06", "PUB-07", "PUB-10", "PUB-12", "PUB-13"):
+    if _base in CASES and _base in SCRIPTS:
+        CASES[_base + "n"] = dict(CASES[_base], id=_base + "n", noisy_api=True)
+        SCRIPTS[_base + "n"] = SCRIPTS[_base]
 if "PUB-01" in CASES:
     CASES["PUB-01t"] = dict(CASES["PUB-01"], id="PUB-01t", timeout_first=True)
     SCRIPTS["PUB-01t"] = SCRIPTS["PUB-01"]
@@ -174,7 +179,27 @@ class Bank:
         if not isinstance(r, dict):
             return r
         out = dict((runtime.resp_field(self.spec, tool, k), v) for k, v in r.items())
-        return out
+        return self._noisy(out) if self.case.get("noisy_api") else out
+
+    def _noisy(self, x, depth=0):
+        """An API that sends booleans and numbers as text, dates with a time, and fields nobody asked for."""
+        self.n = getattr(self, "n", 0) + 1
+        if isinstance(x, bool):
+            return ["true", "True", "yes", "1"][self.n % 4] if x else ["false", "False", "no", "0"][self.n % 4]
+        if isinstance(x, (int, float)):
+            return str(x) if self.n % 2 else f"{float(x):.2f}"
+        if isinstance(x, str) and len(x) == 10 and x[4] == "-" and x[7] == "-":
+            return x + "T00:00:00Z"
+        if isinstance(x, list):
+            return [self._noisy(v, depth + 1) for v in x]
+        if isinstance(x, dict):
+            y = dict((k, self._noisy(v, depth + 1)) for k, v in x.items())
+            y["trace_id"] = "abc-" + str(self.n)
+            y["meta"] = {"server": "mock", "version": 2}
+            if depth == 1:
+                y["opened_on"] = "2019-05-01T09:30:00+02:00"
+            return y
+        return x
 
     def _role(self, tool, field):
         for f in self.spec.get("tool_fields") or []:

@@ -86,6 +86,27 @@ def consume(V, keys):
         V[k] = EMPTY if k in ENUM_VARS else ""
 
 
+TRUE_WORDS = ("true", "yes", "y", "1", "ok", "verified", "passed")
+FALSE_WORDS = ("false", "no", "n", "0", "failed", "none", "null")
+
+
+def truthy(v):
+    """A boolean from an API as it may come: True, 'true', 'True', 'yes', 1."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return v != 0
+    return str(v).strip().lower() in TRUE_WORDS
+
+
+def falsy(v):
+    if isinstance(v, bool):
+        return not v
+    if isinstance(v, (int, float)):
+        return v == 0
+    return str(v).strip().lower() in FALSE_WORDS
+
+
 def jload(x, default):
     if isinstance(x, (dict, list)):
         return x
@@ -745,7 +766,7 @@ def tool_ok(S, tool, d):
     if not isinstance(d, dict):
         return False
     v = d.get(resp_field(S, tool, "ok"), True)
-    return not (v is False or str(v).lower() == "false") and not d.get("error")
+    return not falsy(v) and not d.get("error")
 
 
 def warn(st, msg):
@@ -1189,9 +1210,11 @@ def on_verify_result(S, V, st):
         if st["verify_errors"] <= 2 and st.get("id_last"):
             return call_tool(S, V, st, "verify_identity", {"field": qs[i]["field"], "answer": st["id_last"]})
         return ask_question(S, V, st, not_understood(S, st))
-    hint = str(d.get(resp_field(S, "verify_identity", "hint")) or "")
-    verified = str(d.get(resp_field(S, "verify_identity", "verified"))).lower() == "true"
-    allv = str(d.get(resp_field(S, "verify_identity", "all_verified"))).lower() == "true"
+    hint = str(d.get(resp_field(S, "verify_identity", "hint")) or "").strip()
+    if hint.lower() in ("none", "null", "false"):
+        hint = ""
+    verified = truthy(d.get(resp_field(S, "verify_identity", "verified")))
+    allv = truthy(d.get(resp_field(S, "verify_identity", "all_verified")))
     left = to_float(d.get(resp_field(S, "verify_identity", "wrong_answers_left")))
     if not tool_ok(S, "verify_identity", d) and not verified:
         # the service could not read the answer: not a wrong answer
