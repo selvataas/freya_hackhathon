@@ -11,14 +11,6 @@ import argparse, json, os, pathlib, subprocess, sys, time
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 
-try:
-    import anthropic  # noqa: F401
-except ImportError:
-    venv = ROOT / ".venv" / "bin" / "python"
-    if venv.exists() and pathlib.Path(sys.executable).resolve() != venv.resolve():
-        os.execv(str(venv), [str(venv)] + sys.argv)
-    sys.exit("The anthropic package is missing: pip install -r builder/requirements.txt")
-
 sys.path.insert(0, str(HERE)); sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "tools"))
 import freya
 import openapi_tools, render

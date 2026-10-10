@@ -3,7 +3,7 @@ import concurrent.futures, hashlib, json, os, pathlib, re, time
 
 from spec_schema import SCHEMA, SCHEMA_VERSION, SITUATIONS, NOTE_SITUATIONS, TOOL_ROLES, RESPONSE_ROLES, PHRASES, NAMED_DATES
 
-MODEL = os.environ.get("BUILDER_MODEL", "claude-opus-5-5")
+MODEL = os.environ.get("LLM_MODEL") or os.environ.get("BUILDER_MODEL") or "claude-opus-5-5"
 EFFORT = os.environ.get("BUILDER_EFFORT", "high")
 PROMPT_VERSION = "5"
 CACHE = pathlib.Path(__file__).resolve().parent.parent / "cache"
@@ -52,9 +52,53 @@ unplaced_rules: every rule of the brief that the fields above cannot express, qu
 """
 
 
-def _client():
-    import anthropic
-    return anthropic.Anthropic(max_retries=3)
+API_URL = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/") + "/v1/messages"
+
+
+def _http_messages(body, timeout=900):
+    """The Messages API with the standard library only, for a Python without the anthropic package."""
+    import urllib.request, urllib.error
+    key = os.environ.get("ANTHROPIC_API_KEY") or ""
+    if not key:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set")
+    data = json.dumps(body).encode()
+    last = None
+    for attempt in range(4):
+        req = urllib.request.Request(API_URL, data=data, method="POST", headers={
+            "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            last = RuntimeError(f"Messages API {e.code}: {e.read().decode()[:500]}")
+            if e.code not in (408, 409, 429, 500, 502, 503, 504, 529):
+                raise last from None
+        except (urllib.error.URLError, TimeoutError) as e:
+            last = e
+        time.sleep(5 * (attempt + 1))
+    raise last
+
+
+def _complete(system, messages):
+    """Returns (text, stop_reason, input_tokens, output_tokens). The SDK when it is installed, plain HTTP otherwise."""
+    try:
+        import anthropic
+    except ImportError:
+        anthropic = None
+    if anthropic is not None and hasattr(anthropic, "Anthropic"):
+        try:
+            client = anthropic.Anthropic(max_retries=3)
+            with client.messages.stream(model=MODEL, max_tokens=64000, system=system, output_config={"effort": EFFORT},
+                                        messages=messages) as stream:
+                msg = stream.get_final_message()
+            text = "".join(b.text for b in msg.content if b.type == "text")
+            return text, msg.stop_reason, msg.usage.input_tokens, msg.usage.output_tokens
+        except TypeError:
+            pass  # an old SDK without output_config: use plain HTTP
+    r = _http_messages({"model": MODEL, "max_tokens": 32000, "system": system, "output_config": {"effort": EFFORT}, "messages": messages})
+    text = "".join(b.get("text", "") for b in r.get("content") or [] if b.get("type") == "text")
+    u = r.get("usage") or {}
+    return text, r.get("stop_reason"), u.get("input_tokens"), u.get("output_tokens")
 
 
 def validate(node, schema, path="spec"):
@@ -103,16 +147,12 @@ def _json_from(text):
 
 
 def _ask(trace, purpose, system, messages):
-    client = _client()
     t0 = time.time()
-    with client.messages.stream(model=MODEL, max_tokens=64000, system=system, output_config={"effort": EFFORT},
-                                messages=messages) as stream:
-        msg = stream.get_final_message()
-    text = "".join(b.text for b in msg.content if b.type == "text")
-    trace.event("model_call", model=MODEL, purpose=purpose, effort=EFFORT, stop_reason=msg.stop_reason,
-                input_tokens=msg.usage.input_tokens, output_tokens=msg.usage.output_tokens, seconds=round(time.time() - t0, 1))
-    if msg.stop_reason != "end_turn":
-        raise RuntimeError(f"{purpose}: stop_reason {msg.stop_reason}")
+    text, stop, tin, tout = _complete(system, messages)
+    trace.event("model_call", model=MODEL, purpose=purpose, effort=EFFORT, stop_reason=stop,
+                input_tokens=tin, output_tokens=tout, seconds=round(time.time() - t0, 1))
+    if stop != "end_turn":
+        raise RuntimeError(f"{purpose}: stop_reason {stop}")
     return text
 
 

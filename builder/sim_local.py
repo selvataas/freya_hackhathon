@@ -1,6 +1,6 @@
 """Run the brain against scripted customers and a fake bank, without the platform. A development check.
 
-    .venv/bin/python builder/sim_local.py out/brief-a.spec.json [case_id ...] [-v]
+    python3 builder/sim_local.py out/brief-a.spec.json [case_id ...] [-v]
 
 Each script turn is what the extraction model would produce for one customer message.
 """

@@ -1,1 +1,2 @@
-anthropic>=1.13
+# Nothing is required: the builder uses the standard library only.
+# If the anthropic package is installed, it is used for the model calls.
