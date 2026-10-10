@@ -91,6 +91,12 @@ VARIANTS.update({
     "R-10w": ("PUB-10", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "the twenty-third of February one nine eight nine", "id_iso": "1989-02-23"},
                          {"id_reply": "answer", "id_answer": "nine nine"}, {"id_reply": "answer", "id_answer": "zero four"},
                          {"reply": "no"}, {"reply": "yes"}, {"reply": "yes"}]),
+    "R-07f": ("PUB-07", [{"presence": "unclear"}, {"presence": "confirmed"},
+                         {"id_reply": "answer", "id_answer": "the fifth of December nineteen seventy-five"},
+                         {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "answer", "id_answer": "seven zero nine three"},
+                         {"reply": "other"}, {"reply": "no"}, {"reply": "vague"}, {"reply": "propose", "date_phrase": "Monday the 26th"}, {"reply": "yes"}, {"reply": "yes"}]),
+    "R-03u": ("PUB-03", [{"presence": "confirmed"}, {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "unclear"},
+                         {"id_reply": "unclear"}, {"id_reply": "unclear"}, {"id_reply": "unclear"}]),
     "R-13": ("PUB-13", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "eighth of January nineteen ninety-one"}, {"id_reply": "answer", "id_answer": "6604"},
                         {"reply": "propose", "date_phrase": "the thirtieth of October", "applies_to_all": "yes"}, {"reply": "question", "q_kind": "other"}, {"reply": "yes"}]),
 })
@@ -101,6 +107,8 @@ for k, (base, turns) in VARIANTS.items():
 if "PUB-01" in CASES:
     CASES["PUB-01t"] = dict(CASES["PUB-01"], id="PUB-01t", timeout_first=True)
     SCRIPTS["PUB-01t"] = SCRIPTS["PUB-01"]
+if "PUB-03" in CASES:
+    CASES["R-03u"] = dict(CASES["PUB-03"], id="R-03u", expected=dict(CASES["PUB-03"]["expected"], reason="declined"))
 # PUB-06c: the floor on Friday is refused, attempt 2 of the late band offers the floor on the deadline
 if "PUB-06" in CASES:
     CASES["PUB-06c"] = dict(CASES["PUB-06"], id="PUB-06c", expected=dict(CASES["PUB-06"]["expected"], promises=[{"product_id": "p1", "amount": 637.5, "date": "2026-10-23"}]))

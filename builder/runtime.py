@@ -958,6 +958,36 @@ def questions(S):
     return [q for q in (((S.get("identity") or {}).get("questions")) or []) if isinstance(q, dict) and q.get("field")]
 
 
+def simple_question(q):
+    """A shorter way to ask the same question, from its answer type (the builder's own words)."""
+    t = q.get("answer_type")
+    if t == "date":
+        return "Just the date, please: the day, the month and the year."
+    if t == "digits":
+        n = int(q.get("digits_length") or 0)
+        return ("Just the " + str(n) + " digits, please, one by one.") if n else "Just the digits, please, one by one."
+    if t == "year":
+        return "Just the year, please."
+    return "Just that, please: " + (q.get("ask_text") or "")
+
+
+def unclear_identity(S, V, st):
+    """1st time: a simpler question. 2nd: the spec's 'not understood' and the question. Then it counts as a refusal."""
+    qs = questions(S)
+    i = int(st.get("q_index") or 0)
+    st["id_unclear"] = int(st.get("id_unclear") or 0) + 1
+    if st["id_unclear"] == 1 and i < len(qs):
+        st["id_partial"] = ""
+        return say(V, st, "talk_id", simple_question(qs[i]))
+    if st["id_unclear"] == 2:
+        return ask_question(S, V, st, phrase(S, "not_understood"))
+    st["id_unclear"] = 0
+    st["refusals"] = int(st.get("refusals") or 0) + 1
+    if st["refusals"] >= int((S.get("identity") or {}).get("max_refusals") or 2):
+        return finish(S, V, st, "id_declined")
+    return ask_question(S, V, st, phrase(S, "decline_explain"))
+
+
 def ask_question(S, V, st, *prefix):
     qs = questions(S)
     i = int(st.get("q_index") or 0)
@@ -1024,12 +1054,14 @@ def on_identity_turn(S, V, st):
     if status == "ok":
         st["id_partial"] = ""
         st["id_last"] = val
+        st["id_unclear"] = 0
         return call_tool(S, V, st, "verify_identity", {"field": qs[i]["field"], "answer": val})
     if status == "partial":
         st["id_partial"] = joined
+        st["id_unclear"] = 0
         return say(V, st, "talk_id", phrase(S, "ask_rest"))
     st["id_partial"] = ""
-    return ask_question(S, V, st, phrase(S, "not_understood"))
+    return unclear_identity(S, V, st)
 
 
 def on_verify_result(S, V, st):
@@ -1054,6 +1086,7 @@ def on_verify_result(S, V, st):
         return start_account(S, V, st)
     if verified:
         st["q_index"] = i + 1
+        st["id_unclear"] = 0
         return ask_question(S, V, st)
     for h in idn.get("hints") or []:
         if hint and h.get("value") == hint and not h.get("counts_as_wrong", False):
@@ -1306,6 +1339,8 @@ def on_main_turn(S, V, st, now):
     p = current(st)
     d, dkind = parse_day_phrase(S, dphrase, today) if dphrase else (None, "none")
     proposes = d is not None or amount is not None
+    if reply not in ("", "other") or proposes:
+        st["main_unclear"] = 0
 
     # while the hardship transfer is offered, only a clear yes transfers; everything else declines it
     if stage == "hardship_offer" and reply in ("restructuring", "human", "question", "other", "no", "not_talking", "too_much"):
@@ -1478,8 +1513,18 @@ def on_main_turn(S, V, st, now):
     if reply == "no":
         return refusal(S, V, st, p, today)
     if q or reply == "question":
+        st["main_unclear"] = 0
         return repeat_last(V, st, "talk_main", answer_for_question(S, q) or phrase(S, "no_info"))
-    return repeat_last(V, st, "talk_main", phrase(S, "not_understood"))
+    # not understood: a short hint first, then the spec's words; the third time it is a non-answer (a refusal)
+    st["main_unclear"] = int(st.get("main_unclear") or 0) + 1
+    if st["main_unclear"] == 1:
+        return say(V, st, "talk_main", st.get("last_ask") or "", "A yes or a no is enough.")
+    if st["main_unclear"] == 2:
+        return repeat_last(V, st, "talk_main", phrase(S, "not_understood"))
+    st["main_unclear"] = 0
+    if st.get("stage") == "confirm":
+        return repeat_last(V, st, "talk_main", phrase(S, "not_understood"))
+    return refusal(S, V, st, p, today)
 
 
 def refusal(S, V, st, p, today):
