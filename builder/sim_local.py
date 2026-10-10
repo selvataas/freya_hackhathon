@@ -88,6 +88,9 @@ VARIANTS.update({
                         {"reply": "yes"}, {"reply": "yes"}]),
     "R-10": ("PUB-10", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "23.02.1989"}, {"id_reply": "answer", "id_answer": "nine nine oh four"},
                         {"reply": "no", "q_kind": "other"}, {"reply": "yes", "q_kind": "ai"}, {"reply": "yes"}]),
+    "R-10w": ("PUB-10", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "the twenty-third of February one nine eight nine", "id_iso": "1989-02-23"},
+                         {"id_reply": "answer", "id_answer": "nine nine"}, {"id_reply": "answer", "id_answer": "zero four"},
+                         {"reply": "no"}, {"reply": "yes"}, {"reply": "yes"}]),
     "R-13": ("PUB-13", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "eighth of January nineteen ninety-one"}, {"id_reply": "answer", "id_answer": "6604"},
                         {"reply": "propose", "date_phrase": "the thirtieth of October", "applies_to_all": "yes"}, {"reply": "question", "q_kind": "other"}, {"reply": "yes"}]),
 })

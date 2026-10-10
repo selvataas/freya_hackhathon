@@ -398,6 +398,14 @@ def parse_year_words(t):
     if m:
         return int(m.group(1))
     toks = re.findall(r"[a-z]+", t)
+    # a year said digit by digit: "one nine eight nine"
+    digits = [str(UNITS[w]) for w in toks if w in UNITS and UNITS[w] < 10]
+    for i in range(len(toks) - 3):
+        run4 = toks[i:i + 4]
+        if all(w in UNITS and UNITS[w] < 10 for w in run4):
+            y = int("".join(str(UNITS[w]) for w in run4))
+            if 1900 <= y <= 2099:
+                return y
     for i, w in enumerate(toks):
         if w in ("nineteen", "twenty") and i + 1 < len(toks):
             base = 1900 if w == "nineteen" else 2000
@@ -455,6 +463,7 @@ def parse_dob(text, order):
     mon = find_month(t2)
     year = parse_year_words(t2)
     t3 = re.sub(r"\b(19|20)\d\d\b", " ", t2)
+    t3 = re.sub(r"\b(one|oh|zero|two)(\s+(zero|oh|one|two|three|four|five|six|seven|eight|nine)){3}\s*$", " ", t3)
     if year:
         # strip the year words so that "nineteen eighty-eight" does not look like a day
         t3 = re.sub(r"\b(nineteen|twenty|two thousand)(\s+(and\s+)?[a-z]+){0,2}\s*$", " ", t3)
