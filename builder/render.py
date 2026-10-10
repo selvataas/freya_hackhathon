@@ -200,8 +200,15 @@ def _custom_field(spec, phase):
     return [_ex("custom", "string", "Only if the LAST message is one of these situations: " + desc + ". Otherwise none.", [c["name"] for c in cs])]
 
 
+def _state_field():
+    return {"name": "message_state", "type": "string", "min_confidence": 0.5, "max_retries": 0, "enum_values": ["complete", "cut_off", "none"],
+            "description": "cut_off = the LAST customer message stops in the middle: in the middle of a sentence, a word or a number, as if the customer "
+                           "has not finished (for example it ends with 'and', 'to', 'the', 'my', a half word, or the first part of a number or a date). "
+                           "complete = anything else, also a short answer like 'yes' or a number on its own."}
+
+
 def extraction(spec, phase):
-    return _extraction(spec, phase) + _custom_field(spec, phase)
+    return _extraction(spec, phase) + _custom_field(spec, phase) + [_state_field()]
 
 
 def _extraction(spec, phase):

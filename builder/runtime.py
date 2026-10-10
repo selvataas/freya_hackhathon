@@ -25,7 +25,12 @@ VAGUE_WORDS = ["next week", "end of the month", "end of month", "salary", "payda
 # ---------------------------------------------------------------- small helpers
 
 EMPTY = "none"
-ENUM_VARS = ("presence", "q_kind", "id_reply", "reply", "applies_to_all", "custom")
+ENUM_VARS = ("presence", "q_kind", "id_reply", "reply", "applies_to_all", "custom", "message_state")
+# the builder's own words, not a brief's: said while waiting for the rest of a cut-off message, and after a failed save
+GO_ON = "Go on."
+NOT_SAVED = "Just to be clear, this has not been saved yet."
+TRY_AGAIN = "I will try once more now."
+NOT_SAVED_FINAL = "Just to be clear, this has not been saved."
 
 
 def sval(V, k):
@@ -644,6 +649,18 @@ def say(V, st, node, *parts):
     st["pending"] = node
 
 
+def go_on(V, st, node):
+    """The customer has not finished: a short prompt, no question, nothing counted. At most twice in a row."""
+    if int(st.get("go_on") or 0) >= 2:
+        return False
+    st["go_on"] = int(st.get("go_on") or 0) + 1
+    V["say_line"] = GO_ON
+    V["instruction"] = 'Say exactly: "' + GO_ON + '"'
+    V["next_step"] = node + "_fixed"
+    st["pending"] = node
+    return True
+
+
 def repeat_last(V, st, node, *prefix):
     say(V, st, node, *(list(prefix) + [st.get("last_ask") or st.get("last_say") or ""]))
 
@@ -871,6 +888,8 @@ def on_presence(S, V, st, now):
     if kind in ("not_talking", "refuses"):
         if count_not_talking(S, st):
             return finish(S, V, st, "id_declined")
+    if st.get("_cut") and kind in ("", "unclear") and not q and go_on(V, st, "talk_pre"):
+        return
     st["asks"] = int(st.get("asks") or 1) + 1
     if st["asks"] > maxa:
         return finish(S, V, st, "unclear")
@@ -896,8 +915,15 @@ def on_third_party(S, V, st, now):
     if not tp.get("callback_enabled", True):
         return finish(S, V, st, "no_callback")
     today = now.date()
+    if st.get("cb_frag"):
+        text = join(st.pop("cb_frag"), text)
     d, _ = parse_day_phrase(S, text, today)
     tm = parse_time(text)
+    if st.get("_cut") and not (d is not None and tm):
+        st["cb_frag"] = text
+        if go_on(V, st, "talk_pre"):
+            return
+        st.pop("cb_frag", None)
     if d is None and not tm:
         if kind in ("refuses", "not_talking"):
             return finish(S, V, st, "no_callback", phrase(S, "no_callback"))
@@ -1046,6 +1072,8 @@ def on_identity_turn(S, V, st):
     i = int(st.get("q_index") or 0)
     if i >= len(qs):
         return start_account(S, V, st)
+    if st.get("_cut") and not raw and not iso and rk in ("", "unclear", "answer") and go_on(V, st, "talk_id"):
+        return
     if rk == "question" and not raw and not iso:
         ans = (phrase(S, "purpose_answer") or phrase(S, "no_info")) if q == "purpose" or not q else (answer_for_question(S, q) or phrase(S, "no_info"))
         return ask_question(S, V, st, ans)
@@ -1059,6 +1087,8 @@ def on_identity_turn(S, V, st):
     if status == "partial":
         st["id_partial"] = joined
         st["id_unclear"] = 0
+        if st.get("_cut") and go_on(V, st, "talk_id"):
+            return
         return say(V, st, "talk_id", phrase(S, "ask_rest"))
     st["id_partial"] = ""
     return unclear_identity(S, V, st)
@@ -1267,6 +1297,11 @@ def on_promise_result(S, V, st, today):
         p["unknown"] = True
     p["retries"] = int(p.get("retries") or 0) + 1
     if p["retries"] <= int((S.get("promise") or {}).get("retries") or 1):
+        if d is not None and not p.get("told_unsaved"):
+            # the bank answered with a failure: say so plainly before trying again
+            p["told_unsaved"] = True
+            st["stage"] = "retry_wait"
+            return say(V, st, "talk_main", NOT_SAVED, TRY_AGAIN)
         return call_tool(S, V, st, "create_promise", {"product_id": p["id"], "amount": p["amount"], "date": p["date"]})
     p["status"] = "failed"
     p["note_sit"] = "service_error"
@@ -1314,6 +1349,7 @@ def closing_words(S, V, st, today):
         lines.append(phrase(S, "after_promise"))
     if failed:
         lines.append(phrase(S, "service_error", product=", ".join(p["spoken"] for p in failed)))
+        lines.append(NOT_SAVED_FINAL)
     return finish(S, V, st, st.get("situation") or "", *lines)
 
 
@@ -1328,10 +1364,32 @@ def on_main_turn(S, V, st, now):
     today = now.date()
     reply = sval(V, "reply")
     dphrase = sval(V, "date_phrase")
+    V["_amount_raw"] = sval(V, "amount")
     amount = to_float(sval(V, "amount"))
     allp = sval(V, "applies_to_all")
     q = sval(V, "q_kind")
     consume(V, ("reply", "date_phrase", "amount", "applies_to_all", "q_kind"))
+    if stage_is(st, "retry_wait"):
+        # the customer answered the 'not saved yet' line: try the save again
+        st["stage"] = "confirm"
+        pid = st.get("recording")
+        for x in st.get("products") or []:
+            if x.get("id") == pid:
+                return call_tool(S, V, st, "create_promise", {"product_id": x["id"], "amount": x["amount"], "date": x["date"]})
+        return record_next(S, V, st, now.date())
+    frag_d, frag_a = st.pop("frag_date", ""), st.pop("frag_amount", "")
+    if frag_d and dphrase:
+        both = join(frag_d, dphrase)
+        if parse_day_phrase(S, both, today)[0] is not None:
+            dphrase = both
+    elif frag_d and not dphrase:
+        dphrase = frag_d
+    raw_amount = sval(V, "_amount_raw")
+    if frag_a and amount is not None:
+        a2 = to_float(join(frag_a, raw_amount))
+        amount = a2 if a2 is not None else amount
+    elif frag_a and amount is None:
+        amount = to_float(frag_a)
     stage = st.get("stage") or "ask_today"
     prods = st.get("products") or []
     multi = len(prods) > 1
@@ -1339,6 +1397,19 @@ def on_main_turn(S, V, st, now):
     p = current(st)
     d, dkind = parse_day_phrase(S, dphrase, today) if dphrase else (None, "none")
     proposes = d is not None or amount is not None
+    if st.get("_cut") and not q and reply in ("", "other", "vague", "propose", "yes", "no"):
+        # a cut-off message: keep its date and amount words and wait for the rest, unless it already says enough
+        last = (re.findall(r"[a-z]+|\d+", dphrase.lower()) or [""])[-1]
+        dangling = last in TENS or last in ("the", "of", "on", "and", "at", "in", "next", "this")
+        complete_date = d is not None and dkind == "date" and not dangling
+        if not complete_date and not (reply in ("yes", "no") and not dphrase and amount is None):
+            if dphrase:
+                st["frag_date"] = dphrase
+            if raw_amount:
+                st["frag_amount"] = raw_amount
+            if go_on(V, st, "talk_main"):
+                return
+            st.pop("frag_date", None); st.pop("frag_amount", None)
     if reply not in ("", "other") or proposes:
         st["main_unclear"] = 0
 
@@ -1555,6 +1626,10 @@ def brain(V, S):
         V["next_step"] = "talk_main_llm" if (load_state(V) or {}).get("phase") == "main" else "talk_pre_llm"
 
 
+def stage_is(st, name):
+    return st.get("stage") == name
+
+
 def custom_hit(S, V, st, phase):
     name = sval(V, "custom")
     if not name:
@@ -1587,6 +1662,10 @@ def run(V, S):
     phase = st.get("phase")
     today = now.date()
     asked = sval(V, "q_kind") if not pend.startswith("tool:") else ""
+    st["_cut"] = (not pend.startswith("tool:")) and sval(V, "message_state") == "cut_off"
+    consume(V, ("message_state",))
+    if not st["_cut"] and not pend.startswith("tool:"):
+        st["go_on"] = 0
     answer = answer_for_question(S, asked) if asked in ("ai", "scam") else ""
     if pend == "tool:verify_identity":
         on_verify_result(S, V, st)
@@ -1636,5 +1715,6 @@ def run(V, S):
             st["answer_pending"] = answer  # a tool runs first: say it with the next line
     elif st.get("answer_pending") and str(V.get("next_step") or "").endswith("_fixed"):
         say(V, st, V["next_step"][:-len("_fixed")], st.pop("answer_pending"), V.get("say_line") or "")
+    st.pop("_cut", None)
     set_final(S, V, st)
     save(V, st)

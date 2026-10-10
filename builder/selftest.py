@@ -165,7 +165,7 @@ def scenarios(S):
             out.append(_case(S, "hardship", [one()], login + [{"reply": "hardship"}], _exp(S, "hardship", notes=_notes_for(S, ["p1"], "hardship")), now))
 
     retries = int((S.get("promise") or {}).get("retries") or 1)
-    out.append(_case(S, f"the promise service fails {retries + 1} times", [one()], login + [{"reply": "yes"}, {"reply": "yes"}],
+    out.append(_case(S, f"the promise service fails {retries + 1} times", [one()], login + [{"reply": "yes"}, {"reply": "yes"}, {"reply": "other"}],
                      _exp(S, "service_error", notes=_notes_for(S, ["p1"], "service_error")), now,
                      faults=[{"tool": "create_promise", "fail_first_n": retries + 1}]))
 
