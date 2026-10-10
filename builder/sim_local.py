@@ -64,6 +64,30 @@ VARIANTS = {
                            {"reply": "hardship", "q_kind": "other"}, {"reply": "restructuring"}]),
     "PUB-02b": ("PUB-02", [{"presence": "other_person", "cb_phrase": "she is back tomorrow, call around eleven"}]),
 }
+# realistic customers: numbers in pieces, words for amounts and dates, self-corrections, small talk, questions back
+VARIANTS.update({
+    "R-01": ("PUB-01", [{"presence": "unclear", "q_kind": "other"}, {"presence": "confirmed"},
+                        {"id_reply": "answer", "id_answer": "the fourteenth of March"}, {"id_reply": "answer", "id_answer": "nineteen eighty-eight"},
+                        {"id_reply": "answer", "id_answer": "four four"}, {"id_reply": "answer", "id_answer": "seven one"},
+                        {"reply": "question", "q_kind": "scam"}, {"reply": "other"},
+                        {"reply": "propose", "amount": "four hundred and twenty", "date_phrase": "today"}, {"reply": "yes"}]),
+    "R-06": ("PUB-06", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "17/05/1986"}, {"id_reply": "answer", "id_answer": "fifteen oh two"},
+                        {"reply": "too_much"}, {"reply": "question", "q_kind": "other"},
+                        {"reply": "propose", "date_phrase": "the twentieth, sorry, I mean this Friday"},
+                        {"reply": "yes"}]),
+    "R-07": ("PUB-07", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "fifth of December nineteen seventy-five"},
+                        {"id_reply": "answer", "id_answer": "seven zero nine three"},
+                        {"reply": "other"}, {"reply": "no"}, {"reply": "vague", "date_phrase": "after my cousin's wedding"},
+                        {"reply": "propose", "date_phrase": "Monday the twenty-sixth"}, {"reply": "yes"}, {"reply": "yes"}]),
+    "R-04": ("PUB-04", [{"presence": "question", "q_kind": "ai"}, {"presence": "confirmed"},
+                        {"id_reply": "answer", "id_answer": "thirtieth of January nineteen eighty-four"}, {"id_reply": "answer", "id_answer": "two two", "q_kind": "none"},
+                        {"id_reply": "answer", "id_answer": "one nine"}, {"reply": "propose", "date_phrase": "the sixth of November", "amount": "one thousand two hundred and fifty"},
+                        {"reply": "yes"}, {"reply": "yes"}]),
+    "R-10": ("PUB-10", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "23.02.1989"}, {"id_reply": "answer", "id_answer": "nine nine oh four"},
+                        {"reply": "no", "q_kind": "other"}, {"reply": "yes", "q_kind": "ai"}, {"reply": "yes"}]),
+    "R-13": ("PUB-13", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "eighth of January nineteen ninety-one"}, {"id_reply": "answer", "id_answer": "6604"},
+                        {"reply": "propose", "date_phrase": "the thirtieth of October", "applies_to_all": "yes"}, {"reply": "question", "q_kind": "other"}, {"reply": "yes"}]),
+})
 for k, (base, turns) in VARIANTS.items():
     CASES[k] = dict(CASES[base], id=k)
     SCRIPTS[k] = turns

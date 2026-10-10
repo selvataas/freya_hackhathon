@@ -1571,12 +1571,15 @@ def run(V, S):
     if st.get("lead") and V.get("next_step") == "bye":
         V["farewell"] = join(st.pop("lead"), V.get("farewell", ""))
     if answer:
-        if str(V.get("next_step") or "").endswith("_fixed") and answer not in (V.get("say_line") or ""):
-            say(V, st, V["next_step"][:-len("_fixed")], answer, V.get("say_line") or "")
-        elif V.get("next_step") == "bye" and answer not in (V.get("farewell") or ""):
-            V["farewell"] = join(answer, V.get("farewell") or "")
+        nxt = str(V.get("next_step") or "")
+        if nxt.endswith("_fixed"):
+            if answer not in (V.get("say_line") or ""):
+                say(V, st, nxt[:-len("_fixed")], answer, V.get("say_line") or "")
+        elif nxt == "bye":
+            if answer not in (V.get("farewell") or ""):
+                V["farewell"] = join(answer, V.get("farewell") or "")
         else:
-            st["answer_pending"] = answer
+            st["answer_pending"] = answer  # a tool runs first: say it with the next line
     elif st.get("answer_pending") and str(V.get("next_step") or "").endswith("_fixed"):
         say(V, st, V["next_step"][:-len("_fixed")], st.pop("answer_pending"), V.get("say_line") or "")
     set_final(S, V, st)
