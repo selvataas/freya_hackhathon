@@ -1671,6 +1671,26 @@ def on_main_turn(S, V, st, now):
         if ok_d is None:
             return ask(V, st, "talk_main", phrase(S, "past_date"))
         everyone = multi and len(open_products(st)) > 1 and (allp == "yes" or (stage == "ask_today" and allp != "no"))
+        if everyone and not (S.get("multi_product") or {}).get("clamp_to_deadline", True):
+            # one day for everything, but the brief has no rule to move a product to its own deadline: the day goes
+            # to every product it is valid for; the others get their own offer in turn
+            for x in open_products(st):
+                x_d, x_prob = check_date(S, x, d, today)
+                if x_d is not None and not x_prob:
+                    x["amount"] = a if x is p else (x["offer"][0] if x.get("offer") else (x["floor"] if x.get("too_much") else x["due"]))
+                    x["date"], x["status"], x["offer"], x["entered"] = x_d.isoformat(), "agreed", None, True
+            rest = open_products(st)
+            if not rest:
+                return readback(S, V, st, today)
+            x = current(st)
+            x["entered"] = True
+            x_d, x_prob = check_date(S, x, d, today)
+            amt = x["offer"][0] if x.get("offer") else x["due"]
+            if x_d is None:
+                return attempt_offer(S, V, st, x, today)
+            lead = phrase(S, "latest_date", date=fmt_date(x_d, today)) if x_prob == "after_deadline" else \
+                phrase(S, "not_business_day", date=fmt_date(d, today), next=fmt_date(x_d, today))
+            return make_offer(S, V, st, x, amt, x_d.isoformat(), today, lead)
         if everyone and problem in ("", "after_deadline") and (S.get("multi_product") or {}).get("clamp_to_deadline", True):
             for x in open_products(st):
                 x_d, x_prob = check_date(S, x, d, today)

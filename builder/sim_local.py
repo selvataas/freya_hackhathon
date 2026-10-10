@@ -143,6 +143,15 @@ for k, (base, turns) in VARIANTS.items():
     if base in CASES:
         CASES[k] = dict(CASES[base], id=k)
         SCRIPTS[k] = turns
+# several products with a spec that has no multi-product rules (Brief A): one day for all goes where it is valid
+if "PUB-13" in CASES:
+    CASES["R-multiA"] = dict(CASES["PUB-13"], id="R-multiA", expected=dict(CASES["PUB-13"]["expected"], notes=[]))
+    SCRIPTS["R-multiA"] = [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "8 January 1991"}, {"id_reply": "answer", "id_answer": "6604"},
+                           {"reply": "propose", "date_phrase": "30 October", "applies_to_all": "yes"}, {"reply": "yes"}, {"reply": "yes"}]
+if "PUB-11" in CASES:
+    CASES["R-multiA2"] = dict(CASES["PUB-11"], id="R-multiA2", expected=dict(CASES["PUB-11"]["expected"], notes=[]))
+    SCRIPTS["R-multiA2"] = [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "3 June 1987"}, {"id_reply": "answer", "id_answer": "2288"},
+                            {"reply": "propose", "date_phrase": "this Friday", "applies_to_all": "yes"}, {"reply": "yes"}]
 # the same customers against an API that answers in loose types (see Bank._noisy)
 for _base in ("PUB-01", "PUB-03", "PUB-04", "PUB-06", "PUB-07", "PUB-10", "PUB-12", "PUB-13"):
     if _base in CASES and _base in SCRIPTS:
