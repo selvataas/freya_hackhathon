@@ -1,0 +1,507 @@
+[
+ {
+  "id": "CD-1",
+  "spec": "brief-a",
+  "title": "Friday: attempt 1 is the last business day of next week",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-16T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "CD-2",
+  "spec": "brief-a",
+  "title": "Saturday: 'today' is offered as Monday",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-17T10:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-19"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "CD-3",
+  "spec": "brief-a",
+  "title": "eve of the 26 October holiday: no callback on the holiday",
+  "variables": {
+   "first_name": "Maria",
+   "last_name": "Costa",
+   "title": "Ms",
+   "now": "2026-10-23T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1979-11-02",
+   "phone_last4": "0358"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 310.5,
+    "days_late": 11,
+    "instalment_amount": 103.5,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "Monday at eleven"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "Tuesday at eleven"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-10-27",
+     "time": "11:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "CD-4",
+  "spec": "brief-a",
+  "title": "day after the holiday: late-band deadline 5 November",
+  "variables": {
+   "first_name": "Lena",
+   "last_name": "Hoffmann",
+   "title": "Ms",
+   "now": "2026-10-27T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1984-01-30",
+   "phone_last4": "2219"
+  },
+  "products": [
+   {
+    "type": "car_loan",
+    "past_due": 1250.0,
+    "days_late": 14,
+    "instalment_amount": 400.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "30 January 1984"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "2219"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "the 30th of November"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 1250.0,
+     "date": "2026-11-05"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "CD-5",
+  "spec": "brief-a",
+  "title": "after hours: 18:00 today has passed, Monday 10:00",
+  "variables": {
+   "first_name": "Maria",
+   "last_name": "Costa",
+   "title": "Ms",
+   "now": "2026-10-30T18:30"
+  },
+  "identity": {
+   "date_of_birth": "1979-11-02",
+   "phone_last4": "0358"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 310.5,
+    "days_late": 11,
+    "instalment_amount": 103.5,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "today at six in the evening"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "Monday at ten"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-11-02",
+     "time": "10:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "CD-6",
+  "spec": "brief-a",
+  "title": "early morning: 09:00 is before the window, 10:00 is fine",
+  "variables": {
+   "first_name": "Maria",
+   "last_name": "Costa",
+   "title": "Ms",
+   "now": "2026-10-19T08:00"
+  },
+  "identity": {
+   "date_of_birth": "1979-11-02",
+   "phone_last4": "0358"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 310.5,
+    "days_late": 11,
+    "instalment_amount": 103.5,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "today at nine"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "today at ten"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-10-19",
+     "time": "10:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "CD-7",
+  "spec": "brief-a",
+  "title": "Sunday: 'next Friday' is the Friday of the following week",
+  "variables": {
+   "first_name": "Samuel",
+   "last_name": "Ortiz",
+   "title": "Mr",
+   "now": "2026-10-25T15:00"
+  },
+  "identity": {
+   "date_of_birth": "1975-12-05",
+   "phone_last4": "7093"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 540.0,
+    "days_late": 5,
+    "instalment_amount": 180.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "5 December 1975"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "7093"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "next Friday"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 540.0,
+     "date": "2026-10-30"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "CD-8",
+  "spec": "brief-a",
+  "title": "on a holiday: 'today' is offered as the next business day",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-11-11T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-11-12"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "CD-9",
+  "spec": "brief-a",
+  "title": "month end: a vague period, then 3 December",
+  "variables": {
+   "first_name": "Samuel",
+   "last_name": "Ortiz",
+   "title": "Mr",
+   "now": "2026-11-30T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1975-12-05",
+   "phone_last4": "7093"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 540.0,
+    "days_late": 5,
+    "instalment_amount": 180.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "5 December 1975"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "7093"
+   },
+   {
+    "reply": "vague",
+    "date_phrase": "end of the month"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "the third of December"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 540.0,
+     "date": "2026-12-03"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ }
+]

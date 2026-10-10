@@ -81,8 +81,25 @@ def _notes_for(S, pids, situation):
     return [{"product_id": p, "reason": reason} for p in pids] if reason else []
 
 
-def scenarios(S):
-    now = _now(S)
+def days(S):
+    """'Now' moments to test, derived from the spec's own calendar: weekdays, a weekend, a month end, the days around
+    a holiday, early and late hours."""
+    base = _now(S).date()
+    monday = base - datetime.timedelta(days=base.weekday())
+    at = lambda d, h=11, m=0: datetime.datetime.combine(d, datetime.time(h, m))
+    out = [("base", at(base)), ("Monday", at(monday)), ("Friday", at(monday + datetime.timedelta(days=4))),
+           ("Saturday", at(monday + datetime.timedelta(days=5))), ("Sunday", at(monday + datetime.timedelta(days=6), 15)),
+           ("early morning", at(monday + datetime.timedelta(days=1), 8)), ("after hours", at(monday + datetime.timedelta(days=3), 18, 30))]
+    nm = D(base.year + base.month // 12, base.month % 12 + 1, 1)
+    out.append(("month end", at(nm - datetime.timedelta(days=1))))
+    for h in sorted((S.get("calendar") or {}).get("holidays") or [])[:2]:
+        hd = D.fromisoformat(h)
+        out += [(f"eve of {h}", at(hd - datetime.timedelta(days=1))), (f"after {h}", at(hd + datetime.timedelta(days=1)))]
+    return out
+
+
+def scenarios(S, now=None):
+    now = now or _now(S)
     today = now.date()
     qs = R.questions(S)
     login = [{"presence": "confirmed"}] + [{"id_reply": "answer", "id_answer": _answer(q)[0]} for q in qs]
@@ -100,8 +117,10 @@ def scenarios(S):
 
     p = one()
     pl = plan(p)
-    out.append(_case(S, "happy path: pays in full today", [p], login + [{"reply": "yes"}, {"reply": "yes"}],
-                     _exp(S, "promise_recorded", [{"product_id": "p1", "amount": pl["due"], "date": today.isoformat()}], notes=[]), now))
+    pay_day, prob = R.check_date(S, pl, today, today)
+    happy = login + [{"reply": "yes"}] + ([{"reply": "yes"}] if prob else []) + [{"reply": "yes"}]
+    out.append(_case(S, "happy path: pays in full today" + (" (not a business day: the next one)" if prob else ""), [p], happy,
+                     _exp(S, "promise_recorded", [{"product_id": "p1", "amount": pl["due"], "date": (pay_day or today).isoformat()}], notes=[]), now))
 
     for b in bands:
         p = one(0, b)
@@ -130,8 +149,8 @@ def scenarios(S):
 
     tp = S.get("third_party") or {}
     if tp.get("callback_enabled", True):
-        days = R.allowed_callback_days(S, now)
-        day = days[-1]
+        cb_days = R.allowed_callback_days(S, now)
+        day = cb_days[-1]
         tm = tp.get("window_start") or "12:00"
         if day == today and tm <= now.strftime("%H:%M"):
             tm = tp.get("window_end") or "23:00"
@@ -165,7 +184,7 @@ def scenarios(S):
             out.append(_case(S, "hardship", [one()], login + [{"reply": "hardship"}], _exp(S, "hardship", notes=_notes_for(S, ["p1"], "hardship")), now))
 
     retries = int((S.get("promise") or {}).get("retries") or 1)
-    out.append(_case(S, f"the promise service fails {retries + 1} times", [one()], login + [{"reply": "yes"}, {"reply": "yes"}],
+    out.append(_case(S, f"the promise service fails {retries + 1} times", [one()], happy,
                      _exp(S, "service_error", notes=_notes_for(S, ["p1"], "service_error")), now,
                      faults=[{"tool": "create_promise", "fail_first_n": retries + 1}]))
 
@@ -192,11 +211,15 @@ def scenarios(S):
     return out
 
 
-def run(spec):
-    """Returns a list of {name, pass, problems}. Never raises."""
+def run(spec, all_days=True):
+    """Returns a list of {name, pass, problems}. Never raises. With all_days, every scenario runs on every 'now'."""
     results = []
     try:
-        cases = scenarios(spec)
+        cases = []
+        for label, now in (days(spec) if all_days else [("base", _now(spec))]):
+            for c in scenarios(spec, now):
+                c["id"] = f"[{label} {now:%a %Y-%m-%d %H:%M}] {c['id']}"
+                cases.append(c)
     except Exception as e:
         return [{"name": "making the scenarios", "pass": False, "problems": [repr(e)]}]
     for c in cases:

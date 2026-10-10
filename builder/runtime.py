@@ -1620,6 +1620,11 @@ def on_main_turn(S, V, st, now):
         return agree(S, V, st, p, a, ok_d.isoformat(), today)
     if reply == "yes":
         if stage == "ask_today":
+            ok_today, problem = check_date(S, p, today, today)
+            if problem == "non_business" and ok_today is not None:
+                # a call on a weekend or a holiday: today is not a payment day, offer the next one
+                return make_offer(S, V, st, p, p["due"], ok_today.isoformat(), today,
+                                  phrase(S, "not_business_day", date=fmt_date(today, today), next=fmt_date(ok_today, today)))
             for x in open_products(st):
                 x["amount"], x["date"], x["status"], x["offer"] = x["due"], today.isoformat(), "agreed", None
             return readback(S, V, st, today)
