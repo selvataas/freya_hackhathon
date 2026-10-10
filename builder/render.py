@@ -231,7 +231,7 @@ def _extraction(spec, phase):
             "propose = names a day or an amount themselves; too_much = says the amount is too much or too high; vague = names only a period or a condition, not a day; "
             "hardship = describes a personal hardship that makes paying hard" + _examples(hs.get("trigger_examples")) + "; "
             "already_paid = says they already paid" + _examples((rq.get("already_paid") or {}).get("trigger_examples")) + "; "
-            "dispute = denies that the debt or the product is theirs" + _examples((rq.get("dispute") or {}).get("trigger_examples")) + "; "
+            "dispute = says the debt or the product is not theirs or never was theirs (refusing or being unwilling to pay is not a dispute: that is no)" + _examples((rq.get("dispute") or {}).get("trigger_examples")) + "; "
             "restructuring = asks to change the repayment terms" + _examples((rq.get("restructuring") or {}).get("trigger_examples")) + "; "
             "human = asks for a human or a real person; not_talking = does not want to talk; question = asks a question; "
             "change_recorded = wants to change or cancel a promise that was already recorded; other = anything else. "
