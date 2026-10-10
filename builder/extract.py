@@ -232,8 +232,7 @@ def cache_key(briefs, openapi_text):
     for name, text in briefs:
         h.update(text.encode())
     h.update(openapi_text.encode())
-    # the schema text and the instructions are part of the key: changing a description re-extracts
-    h.update((SCHEMA_VERSION + PROMPT_VERSION + MODEL + EFFORT + json.dumps(SCHEMA, sort_keys=True) + INSTRUCTIONS).encode())
+    h.update((SCHEMA_VERSION + PROMPT_VERSION + MODEL + EFFORT).encode())
     return h.hexdigest()[:16]
 
 
