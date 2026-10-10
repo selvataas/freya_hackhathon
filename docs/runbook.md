@@ -127,8 +127,13 @@ ex = json.load(open(f"submission/{slot}.workflow.json"))
 built = json.load(open(f"out/{slot}.workflow.json"))
 saved = [json.loads(l) for l in open(f"submission/{slot}.trace.jsonl") if '"event": "saved"' in l][-1]
 def walk(a, b, p=""):
+    # every field of ours must be in the export with the same value; the platform may add fields of its own
     if isinstance(a, dict):
-        return sum((walk(v, b.get(k), p + "/" + k) if isinstance(b, dict) and k in b else [p + "/" + k] for k, v in a.items()), [])
+        return sum((walk(v, b[k], p + "/" + k) if isinstance(b, dict) and k in b else [p + "/" + k] for k, v in a.items()), [])
+    if isinstance(a, list):
+        if not isinstance(b, list) or len(a) != len(b):
+            return [p]
+        return sum((walk(x, y, f"{p}[{i}]") for i, (x, y) in enumerate(zip(a, b))), [])
     return [] if a == b else [p]
 diff = walk(built, ex["workflow"])
 print("fields missing or changed:", len(diff), diff[:5])
