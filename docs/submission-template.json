@@ -1,0 +1,46 @@
+{
+  "team": "",
+  "contact": "",
+  "repository": "https://github.com/selvataas/freya_hackhathon",
+  "commit": "",
+  "builder_command": "LLM_MODEL=claude-opus-5-5 python3 builder/build.py <brief>... <openapi.json>",
+  "builder_model": "claude-opus-5-5",
+  "agent_model": "experimental-5",
+  "briefs": [
+    {
+      "brief": "",
+      "brief_files": [],
+      "tool_api_file": "",
+      "slot": "",
+      "workflow_id": "",
+      "agent_id": "",
+      "workflow_export": "submission/<slot>.workflow.json",
+      "trace": "submission/<slot>.trace.jsonl",
+      "build_log": "submission/<slot>.build.log",
+      "build_started": "",
+      "build_ended": "",
+      "build_seconds": null,
+      "model_calls": null,
+      "selftest": "",
+      "warnings": null
+    },
+    {
+      "brief": "",
+      "brief_files": [],
+      "tool_api_file": "",
+      "slot": "",
+      "workflow_id": "",
+      "agent_id": "",
+      "workflow_export": "submission/<slot>.workflow.json",
+      "trace": "submission/<slot>.trace.jsonl",
+      "build_log": "submission/<slot>.build.log",
+      "build_started": "",
+      "build_ended": "",
+      "build_seconds": null,
+      "model_calls": null,
+      "selftest": "",
+      "warnings": null
+    }
+  ],
+  "notes": ""
+}
