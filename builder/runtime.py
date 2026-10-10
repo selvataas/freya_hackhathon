@@ -999,6 +999,24 @@ def simple_question(q):
 UNCLEAR_LIMIT = 4  # the builder's own limit: unclear or off-topic answers in the identity step before the call closes
 
 
+def missing_part(q, partial):
+    """Ask only for what is still missing of an answer given in parts (the builder's own words)."""
+    t = q.get("answer_type")
+    if t == "date":
+        p = (partial or "").lower()
+        if not parse_year_words(p):
+            return "Just the year, please."
+        if not find_month(p):
+            return "Just the month, please."
+        return "Just the day, please."
+    if t == "digits":
+        n = int(q.get("digits_length") or 0)
+        have = len(words_to_digits(partial or ""))
+        if n and have < n:
+            return "Just the remaining " + str(n - have) + " digits, please."
+    return "Just the rest of it, please."
+
+
 def unclear_identity(S, V, st):
     """Unclear or off-topic is never a refusal. The question is asked again, alternating a simpler form and the
     spec's own words. After UNCLEAR_LIMIT unclear answers in a row the call closes as the spec's 'unclear'."""
@@ -1007,7 +1025,8 @@ def unclear_identity(S, V, st):
     st["id_unclear"] = int(st.get("id_unclear") or 0) + 1
     if st["id_unclear"] > UNCLEAR_LIMIT:
         return finish(S, V, st, "unclear")
-    st["id_partial"] = ""
+    if st.get("id_partial") and i < len(qs):
+        return say(V, st, "talk_id", missing_part(qs[i], st["id_partial"]))
     if st["id_unclear"] % 2 == 1 and i < len(qs):
         return say(V, st, "talk_id", simple_question(qs[i]))
     return ask_question(S, V, st, phrase(S, "not_understood"))
@@ -1052,7 +1071,15 @@ def on_identity_turn(S, V, st):
     iso = sval(V, "id_iso")
     rk = sval(V, "id_reply")
     q = sval(V, "q_kind")
-    consume(V, ("id_answer", "id_iso", "id_reply", "q_kind"))
+    last = sval(V, "last_message")
+    consume(V, ("id_answer", "id_iso", "id_reply", "q_kind", "last_message"))
+    if rk in ("answer", "") and not raw and last:
+        raw = last  # the extraction marked an answer but gave no text: use the message itself
+    m = re.match(r"^--(\d{2})-(\d{2})$", iso)
+    if m:
+        # day and month without a year: keep them as words, they join with a year said later
+        raw = join(raw, str(int(m.group(2))) + " " + MONTHS[int(m.group(1)) - 1]) if 1 <= int(m.group(1)) <= 12 else raw
+        iso = ""
     idn = S.get("identity") or {}
     if rk == "human" and handle_human(S, V, st, "talk_id"):
         return
@@ -1060,6 +1087,16 @@ def on_identity_turn(S, V, st):
         if count_not_talking(S, st):
             return finish(S, V, st, "id_declined")
         rk = "refuse"
+    if rk == "already_given":
+        # annoyed, not refusing: say sorry and ask only for what is missing
+        qs = questions(S)
+        i = int(st.get("q_index") or 0)
+        if iso and re.match(r"^\d{4}-\d{2}-\d{2}$", iso):
+            rk, raw = "answer", raw or iso
+        elif i < len(qs):
+            st["id_unclear"] = 0
+            part = st.get("id_partial") or ""
+            return say(V, st, "talk_id", "Sorry about that.", missing_part(qs[i], part) if part else simple_question(qs[i]))
     if rk == "asks_purpose" and not raw:
         rk = "refuse" if idn.get("purpose_question_is_refusal", True) else "question"
     if rk == "refuse" and not raw:
@@ -1073,6 +1110,14 @@ def on_identity_turn(S, V, st):
         return start_account(S, V, st)
     if st.get("_cut") and not raw and not iso and rk in ("", "unclear", "answer") and go_on(V, st, "talk_id"):
         return
+    if rk == "answer" and not raw and not iso:
+        # marked as an answer but nothing came through: not unclear; wait for it and keep any stored part
+        if go_on(V, st, "talk_id"):
+            return
+        qs = questions(S)
+        i = int(st.get("q_index") or 0)
+        if st.get("id_partial") and i < len(qs):
+            return say(V, st, "talk_id", missing_part(qs[i], st["id_partial"]))
     if rk == "question" and not raw and not iso:
         ans = (phrase(S, "purpose_answer") or phrase(S, "no_info")) if q == "purpose" or not q else (answer_for_question(S, q) or phrase(S, "no_info"))
         return ask_question(S, V, st, ans)
@@ -1088,7 +1133,7 @@ def on_identity_turn(S, V, st):
         st["id_unclear"] = 0
         if st.get("_cut") and go_on(V, st, "talk_id"):
             return
-        return say(V, st, "talk_id", phrase(S, "ask_rest"))
+        return say(V, st, "talk_id", missing_part(qs[i], joined))
     st["id_partial"] = ""
     return unclear_identity(S, V, st)
 

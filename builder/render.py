@@ -227,11 +227,15 @@ def _extraction(spec, phase):
             q_kind]
     if phase == "talk_id":
         return [
-            _ex("id_reply", "string", "What the LAST message does with the security question. answer = gives an answer (even partly or wrong); refuse = will not answer; "
-                "asks_purpose = asks what the call is about instead of answering; human = asks for a human; not_talking = does not want to talk; question = asks another question; unclear = anything else.",
-                ["answer", "refuse", "asks_purpose", "human", "not_talking", "question", "unclear"]),
+            _ex("id_reply", "string", "What the LAST message does with the security question. answer = gives an answer (even partly or wrong); "
+                "already_given = says they already gave it (for example 'I already told you', 'I gave you the whole date'), often annoyed: this is not a refusal; "
+                "refuse = clearly will not answer; asks_purpose = asks what the call is about instead of answering; human = asks for a human; not_talking = does not want to talk; "
+                "question = asks another question; unclear = anything else.",
+                ["answer", "already_given", "refuse", "asks_purpose", "human", "not_talking", "question", "unclear"]),
             _ex("id_answer", "string", "The answer in the LAST message, exactly as said, words and digits as they are. If the customer corrects themselves, only the corrected value. Empty if none."),
-            _ex("id_iso", "string", "Only if the LAST message gives a full date (day, month and year): that date as YYYY-MM-DD. Read a date given only as numbers as day, month, year. Empty otherwise."),
+            _ex("id_iso", "string", "If the LAST message gives a date: YYYY-MM-DD when it has day, month and year; --MM-DD when it has only day and month. "
+                "Read a date given only as numbers as day, month, year. Empty otherwise."),
+            _ex("last_message", "string", "The LAST customer message, word for word."),
             q_kind]
     return [
         _ex("reply", "string", "What the LAST customer message does. yes = agrees to what the agent just asked or offered, or confirms; no = says no or cannot, without naming a day or an amount; "

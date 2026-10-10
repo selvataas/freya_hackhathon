@@ -130,6 +130,12 @@ VARIANTS.update({
     "R-07z": ("PUB-07", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "5 December 1975"}, {"id_reply": "answer", "id_answer": "7093"},
                          {"reply": "no"}, {"reply": "propose", "date_phrase": "Monday the twenty-sixth"}, {"reply": "yes"},
                          {"reply": "other"}, {"reply": "other", "message_state": "cut_off"}, {"reply": "other"}, {"reply": "other"}, {"reply": "other"}, {"reply": "other"}]),
+    "R-p1": ("PUB-01", [{'presence': 'confirmed'}, {'id_reply': 'answer', 'id_answer': '', 'last_message': 'The fourteenth of March.'}, {'id_reply': 'answer', 'id_answer': '1988'}, {'id_reply': 'answer', 'id_answer': '4471'}, {'reply': 'yes'}, {'reply': 'yes'}]),
+    "R-p2": ("PUB-01", [{'presence': 'confirmed'}, {'id_reply': 'answer'}, {'id_reply': 'answer', 'id_answer': '14 March 1988'}, {'id_reply': 'answer', 'id_answer': '4471'}, {'reply': 'yes'}, {'reply': 'yes'}]),
+    "R-p3": ("PUB-01", [{'presence': 'confirmed'}, {'id_reply': 'answer', 'id_answer': 'the fourteenth of March'}, {'id_reply': 'unclear'}, {'id_reply': 'answer', 'id_answer': '1988'}, {'id_reply': 'answer', 'id_answer': '4471'}, {'reply': 'yes'}, {'reply': 'yes'}]),
+    "R-p4": ("PUB-01", [{'presence': 'confirmed'}, {'id_reply': 'answer', 'id_iso': '--03-14'}, {'id_reply': 'answer', 'id_answer': 'nineteen eighty-eight'}, {'id_reply': 'answer', 'id_answer': '4471'}, {'reply': 'yes'}, {'reply': 'yes'}]),
+    "R-p5": ("PUB-01", [{'presence': 'confirmed'}, {'id_reply': 'answer', 'id_answer': 'the fourteenth of March'}, {'id_reply': 'already_given'}, {'id_reply': 'already_given'}, {'id_reply': 'answer', 'id_answer': '1988'}, {'id_reply': 'answer', 'id_answer': '4471'}, {'reply': 'yes'}, {'reply': 'yes'}]),
+    "R-p6": ("PUB-01", [{'presence': 'confirmed'}, {'id_reply': 'answer', 'id_answer': '14 March 1988'}, {'id_reply': 'answer', 'id_answer': 'four four'}, {'id_reply': 'already_given', 'q_kind': 'other'}, {'id_reply': 'answer', 'id_answer': 'seven one'}, {'reply': 'yes'}, {'reply': 'yes'}]),
     "R-13": ("PUB-13", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "eighth of January nineteen ninety-one"}, {"id_reply": "answer", "id_answer": "6604"},
                         {"reply": "propose", "date_phrase": "the thirtieth of October", "applies_to_all": "yes"}, {"reply": "question", "q_kind": "other"}, {"reply": "yes"}]),
 })
