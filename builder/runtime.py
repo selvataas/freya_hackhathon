@@ -30,6 +30,43 @@ ENUM_VARS = ("presence", "q_kind", "id_reply", "reply", "applies_to_all", "custo
 GO_ON = "Go on."
 RETRIED_OK = "That didn't go through the first time, but I've tried again and it is now recorded."
 ONE_AT_A_TIME = "Let's take them one at a time."
+# ways to say the builder's own lines, used in turn so that a call does not open several replies the same way
+VARIANTS = {
+    "go_on": ["Go on.", "Please, go on.", "I'm listening.", "Take your time."],
+    "sorry": ["Sorry about that.", "My apologies.", "Sorry, my mistake."],
+    "yes_no": ["A yes or a no is enough.", "Just a yes or a no, please.", "A simple yes or no is fine."],
+    "not_understood": ["Sorry, I missed that.", "I'm sorry, I didn't get that.", "Sorry, could you say that again?"],
+    "date": ["Just the date, please: the day, the month and the year.", "Could you say the full date: day, month and year?", "The day, the month and the year, please."],
+    "digits": ["Just the <n> digits, please, one by one.", "Could you read me the <n> digits, one at a time?", "The <n> digits, please, slowly."],
+    "digits_any": ["Just the digits, please, one by one.", "Could you read me the digits, one at a time?"],
+    "year_only": ["Just the year, please.", "Could you tell me the year, please?", "Which year, please?"],
+    "month_only": ["Just the month, please.", "Which month, please?"],
+    "day_only": ["Just the day, please.", "Which day of the month, please?"],
+    "rest_digits": ["Just the remaining <k> digits, please.", "And the last <k> digits?", "Could you give me the other <k> digits?"],
+    "rest": ["Just the rest of it, please.", "And the rest, please?"],
+}
+
+
+def variant(st, key, **kw):
+    """The next way of saying one of the builder's lines in this call."""
+    opts = VARIANTS[key]
+    used = st.setdefault("variants", {})
+    i = int(used.get(key) or 0)
+    used[key] = i + 1
+    t = opts[i % len(opts)]
+    for k, v in kw.items():
+        t = t.replace("<" + k + ">", str(v))
+    return t
+
+
+def not_understood(S, st):
+    """The spec's line first; when it is not the brief's exact words, it takes turns with the builder's own."""
+    p = (S.get("phrases") or {}).get("not_understood") or {}
+    n = int(st.get("nu_count") or 0)
+    st["nu_count"] = n + 1
+    if p.get("verbatim") or n % 2 == 0 or not p.get("text"):
+        return phrase(S, "not_understood")
+    return variant(st, "not_understood")
 NOT_SAVED_FINAL = "Just to be clear, this has not been saved."
 
 
@@ -654,8 +691,9 @@ def go_on(V, st, node):
     if int(st.get("go_on") or 0) >= 2:
         return False
     st["go_on"] = int(st.get("go_on") or 0) + 1
-    V["say_line"] = GO_ON
-    V["instruction"] = 'Say exactly: "' + GO_ON + '"'
+    line = variant(st, "go_on")
+    V["say_line"] = line
+    V["instruction"] = 'Say exactly: "' + line + '"'
     V["next_step"] = node + "_fixed"
     st["pending"] = node
     return True
@@ -984,38 +1022,40 @@ def questions(S):
     return [q for q in (((S.get("identity") or {}).get("questions")) or []) if isinstance(q, dict) and q.get("field")]
 
 
-def simple_question(q):
+def simple_question(q, st=None):
     """A shorter way to ask the same question, from its answer type (the builder's own words)."""
+    st = st if st is not None else {}
     t = q.get("answer_type")
     if t == "date":
-        return "Just the date, please: the day, the month and the year."
+        return variant(st, "date")
     if t == "digits":
         n = int(q.get("digits_length") or 0)
-        return ("Just the " + str(n) + " digits, please, one by one.") if n else "Just the digits, please, one by one."
+        return variant(st, "digits", n=n) if n else variant(st, "digits_any")
     if t == "year":
-        return "Just the year, please."
+        return variant(st, "year_only")
     return "Just that, please: " + (q.get("ask_text") or "")
 
 
 UNCLEAR_LIMIT = 4  # the builder's own limit: unclear or off-topic answers in the identity step before the call closes
 
 
-def missing_part(q, partial):
+def missing_part(q, partial, st=None):
     """Ask only for what is still missing of an answer given in parts (the builder's own words)."""
+    st = st if st is not None else {}
     t = q.get("answer_type")
     if t == "date":
         p = (partial or "").lower()
         if not parse_year_words(p):
-            return "Just the year, please."
+            return variant(st, "year_only")
         if not find_month(p):
-            return "Just the month, please."
-        return "Just the day, please."
+            return variant(st, "month_only")
+        return variant(st, "day_only")
     if t == "digits":
         n = int(q.get("digits_length") or 0)
         have = len(words_to_digits(partial or ""))
         if n and have < n:
-            return "Just the remaining " + str(n - have) + " digits, please."
-    return "Just the rest of it, please."
+            return variant(st, "rest_digits", k=n - have)
+    return variant(st, "rest")
 
 
 def unclear_identity(S, V, st):
@@ -1027,10 +1067,10 @@ def unclear_identity(S, V, st):
     if st["id_unclear"] > UNCLEAR_LIMIT:
         return finish(S, V, st, "unclear")
     if st.get("id_partial") and i < len(qs):
-        return say(V, st, "talk_id", missing_part(qs[i], st["id_partial"]))
+        return say(V, st, "talk_id", missing_part(qs[i], st["id_partial"], st))
     if st["id_unclear"] % 2 == 1 and i < len(qs):
-        return say(V, st, "talk_id", simple_question(qs[i]))
-    return ask_question(S, V, st, phrase(S, "not_understood"))
+        return say(V, st, "talk_id", simple_question(qs[i], st))
+    return ask_question(S, V, st, not_understood(S, st))
 
 
 def ask_question(S, V, st, *prefix):
@@ -1097,7 +1137,7 @@ def on_identity_turn(S, V, st):
         elif i < len(qs):
             st["id_unclear"] = 0
             part = st.get("id_partial") or ""
-            return say(V, st, "talk_id", "Sorry about that.", missing_part(qs[i], part) if part else simple_question(qs[i]))
+            return say(V, st, "talk_id", variant(st, "sorry"), missing_part(qs[i], part, st) if part else simple_question(qs[i], st))
     if rk == "asks_purpose" and not raw:
         rk = "refuse" if idn.get("purpose_question_is_refusal", True) else "question"
     if rk == "refuse" and not raw:
@@ -1118,7 +1158,7 @@ def on_identity_turn(S, V, st):
         qs = questions(S)
         i = int(st.get("q_index") or 0)
         if st.get("id_partial") and i < len(qs):
-            return say(V, st, "talk_id", missing_part(qs[i], st["id_partial"]))
+            return say(V, st, "talk_id", missing_part(qs[i], st["id_partial"], st))
     if rk == "question" and not raw and not iso:
         ans = (phrase(S, "purpose_answer") or phrase(S, "no_info")) if q == "purpose" or not q else (answer_for_question(S, q) or phrase(S, "no_info"))
         return ask_question(S, V, st, ans)
@@ -1134,7 +1174,7 @@ def on_identity_turn(S, V, st):
         st["id_unclear"] = 0
         if st.get("_cut") and go_on(V, st, "talk_id"):
             return
-        return say(V, st, "talk_id", missing_part(qs[i], joined))
+        return say(V, st, "talk_id", missing_part(qs[i], joined, st))
     st["id_partial"] = ""
     return unclear_identity(S, V, st)
 
@@ -1148,7 +1188,7 @@ def on_verify_result(S, V, st):
         st["verify_errors"] = int(st.get("verify_errors") or 0) + 1
         if st["verify_errors"] <= 2 and st.get("id_last"):
             return call_tool(S, V, st, "verify_identity", {"field": qs[i]["field"], "answer": st["id_last"]})
-        return ask_question(S, V, st, phrase(S, "not_understood"))
+        return ask_question(S, V, st, not_understood(S, st))
     hint = str(d.get(resp_field(S, "verify_identity", "hint")) or "")
     verified = str(d.get(resp_field(S, "verify_identity", "verified"))).lower() == "true"
     allv = str(d.get(resp_field(S, "verify_identity", "all_verified"))).lower() == "true"
@@ -1166,7 +1206,7 @@ def on_verify_result(S, V, st):
     for h in idn.get("hints") or []:
         if hint and h.get("value") == hint and not h.get("counts_as_wrong", False):
             st["last_ask"] = h.get("instruction") or ""
-            return say(V, st, "talk_id", h.get("instruction") or phrase(S, "not_understood"))
+            return say(V, st, "talk_id", h.get("instruction") or not_understood(S, st))
     st["wrong"] = int(st.get("wrong") or 0) + 1
     if (left is not None and left <= 0) or st["wrong"] >= int(idn.get("max_wrong_total") or 3):
         return finish(S, V, st, "id_failed", phrase(S, "id_failed"))
@@ -1643,9 +1683,9 @@ def on_main_turn(S, V, st, now):
     # not understood: a short hint first, then the spec's words; the third time it is a non-answer (a refusal)
     st["main_unclear"] = int(st.get("main_unclear") or 0) + 1
     if st["main_unclear"] == 1:
-        return say(V, st, "talk_main", st.get("last_ask") or "", "A yes or a no is enough.")
+        return say(V, st, "talk_main", st.get("last_ask") or "", variant(st, "yes_no"))
     if st["main_unclear"] == 2:
-        return repeat_last(V, st, "talk_main", phrase(S, "not_understood"))
+        return repeat_last(V, st, "talk_main", not_understood(S, st))
     st["main_unclear"] = 0
     return refusal(S, V, st, p, today)
 
@@ -1655,7 +1695,7 @@ def confirm_unclear(S, V, st, prods, today):
     spec's 'not understood'); then it is not confirmed, as a no would be, and the spec's attempts decide."""
     st["confirm_unclear"] = int(st.get("confirm_unclear") or 0) + 1
     if st["confirm_unclear"] <= UNCLEAR_LIMIT:
-        return repeat_last(V, st, "talk_main", phrase(S, "not_understood") if st["confirm_unclear"] % 2 == 0 else "")
+        return repeat_last(V, st, "talk_main", not_understood(S, st) if st["confirm_unclear"] % 2 == 0 else "")
     st["confirm_unclear"] = 0
     for x in [x for x in prods if x.get("status") == "agreed"]:
         x["status"] = "open"

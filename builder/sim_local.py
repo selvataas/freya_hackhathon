@@ -275,9 +275,17 @@ def run_case(spec, cid, verbose=False):
     case = CASES[cid]
     bank, V, log, script = simulate(spec, case, SCRIPTS[cid])
     problems = compare(bank, case["expected"])
+    # the builder's own lines take turns: the same one never opens two replies in a row
+    starts = [text for who, text in log if who == "AGENT"]
+    for x, y in zip(starts, starts[1:]):
+        for opts in runtime.VARIANTS.values():
+            for o in opts:
+                head = o.split("<")[0].strip()
+                if len(head) > 6 and x.startswith(head) and y.startswith(head):
+                    problems.append(f"same opening twice in a row: '{head}'")
     if cid in ("R-07z",) and not (log and log[-1][1].startswith("[bye]")):
         problems.append("the call did not end with the agent's own goodbye")
-    if cid.startswith("R-short") and any(who == "AGENT" and text.strip() == runtime.GO_ON for who, text in log):
+    if cid.startswith("R-short") and any(who == "AGENT" and text.strip() in runtime.VARIANTS["go_on"] for who, text in log):
         problems.append("'Go on.' after a short complete answer")
     if script:
         problems.append(f"{len(script)} scripted turns left unused")

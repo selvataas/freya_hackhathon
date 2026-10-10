@@ -1,0 +1,11 @@
+From: Ingrid Moe <collections.lead@halden-savings.example>
+To: Voice vendor team
+Date: 9 November 2026
+Subject: Standard segment promise dates
+
+Hi all,
+
+Quick note from the ops review this morning. For customers in the standard segment, the latest promise date is the
+7th working day after today. The priority segment is as described in CP-7.
+
+Ingrid

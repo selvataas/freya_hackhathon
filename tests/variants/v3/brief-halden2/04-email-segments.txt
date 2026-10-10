@@ -1,0 +1,11 @@
+From: Ingrid Moe <collections.lead@halden-savings.example>
+To: Voice vendor team
+Date: 25 October 2026
+Subject: Segment limits for the pilot
+
+Hi all,
+
+For the pilot, the standard segment's latest promise date is the 12th working day after today, so that customers have
+more room. Priority stays at the 6th working day.
+
+Ingrid
