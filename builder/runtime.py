@@ -651,14 +651,19 @@ def call_tool(S, V, st, tool, values):
     for role, val in values.items():
         V["a_" + tool + "_" + tool_field(S, tool, role)] = "" if val is None else str(val)
     V["res_" + tool] = ""
-    V["route"] = "brain"
+    V["raw_" + tool] = ""
+    V["route_" + tool] = "brain"
     V["next_step"] = "do_" + tool
     st["pending"] = "tool:" + tool
 
 
 def tool_result(V, tool):
-    d = jload(V.get("res_" + tool), None)
-    return d if isinstance(d, dict) else None
+    # the post-hook writes res_<tool>; if the hook did not run, the node's response mapping wrote raw_<tool>
+    for k in ("res_" + tool, "raw_" + tool):
+        d = jload(V.get(k), None)
+        if isinstance(d, dict):
+            return d
+    return None
 
 
 def tool_ok(S, tool, d):

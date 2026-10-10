@@ -166,12 +166,15 @@ def _api_node(tool, spec, targets):
     """The tool's post-hook also runs the brain, so the next step is decided without another code-node run.
     The hook writes `route`; if it did not run, `route` is still 'brain' and the node falls back to the brain node."""
     t = _api_tool(tool, spec)
+    # each tool node has its own route variable, written only by its own hook: a hook that did not run
+    # (a timeout under load) leaves it at 'brain', never at a stale value from another node
+    rv = "route_" + tool["name"]
     t["post_process_code"] = (t["post_process_code"] + "\n" + brain_code(spec) +
-                              "try:\n    vars['route'] = vars.get('next_step') or 'brain'\nexcept Exception:\n    pass\n")
+                              f"try:\n    vars['{rv}'] = vars.get('next_step') or 'brain'\nexcept Exception:\n    pass\n")
     return {"name": "do_" + tool["name"], "node_type": "api_request", "passthrough": True, "passthrough_default_transition": "brain",
             "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
-            "pre_actions": [t], "response_mapping": [],
-            "transitions": [_gt("do_" + tool["name"] + "_failure_count", 4, "bye")] + [_eq("route", x, x) for x in targets] + [_always("brain")]}
+            "pre_actions": [t], "response_mapping": [{"path": "data", "variable": "raw_" + tool["name"]}],
+            "transitions": [_gt("do_" + tool["name"] + "_failure_count", 4, "bye")] + [_eq(rv, x, x) for x in targets] + [_always("brain")]}
 
 
 def _ex(name, typ, desc, enum=None):
