@@ -25,7 +25,7 @@ VAGUE_WORDS = ["next week", "end of the month", "end of month", "salary", "payda
 # ---------------------------------------------------------------- small helpers
 
 EMPTY = "none"
-ENUM_VARS = ("presence", "q_kind", "id_reply", "reply", "applies_to_all")
+ENUM_VARS = ("presence", "q_kind", "id_reply", "reply", "applies_to_all", "custom")
 
 
 def sval(V, k):
@@ -711,7 +711,10 @@ def set_final(S, V, st):
     sit = st.get("situation") or ""
     prods = st.get("products") or []
     recorded = [p for p in prods if p.get("status") == "recorded"]
-    if sit.startswith("transfer_"):
+    if sit.startswith("custom:") and not recorded:
+        c = custom_by_name(S, sit[len("custom:"):]) or {}
+        outcome, reason = c.get("outcome") or "", c.get("reason") or ""
+    elif sit.startswith("transfer_"):
         outcome, reason = outcome_for(S, sit)
     elif recorded:
         outcome, reason = outcome_for(S, "promise_recorded")
@@ -745,6 +748,52 @@ def finish(S, V, st, situation, *lead):
     V["farewell"] = join(*(list(lead) + [phrase(S, "goodbye")])) or "Goodbye."
     V["next_step"] = "bye"
     st["pending"] = "bye"
+
+
+# ---------------------------------------------------------------- the brief's own situations (custom_situations)
+
+def custom_by_name(S, name):
+    for c in S.get("custom_situations") or []:
+        if isinstance(c, dict) and c.get("name") == name:
+            return c
+    return None
+
+
+def handle_custom(S, V, st, c, node):
+    """Say the brief's text, then carry on, book a callback, or close with the situation's own outcome."""
+    text = c.get("say_text") or ""
+    if c.get("continue_for_promise"):
+        return repeat_last(V, st, node, text)
+    st["situation"] = "custom:" + c["name"]
+    if c.get("needs_callback"):
+        st["phase"] = "custom_cb"
+        st["cb_asks"] = 0
+        return ask(V, st, "talk_pre", text, c.get("callback_ask_text") or "")
+    for p in st.get("products") or []:
+        if p.get("status") in ("agreed", "confirmed"):
+            p["status"] = "open"
+    return finish(S, V, st, "custom:" + c["name"], text)
+
+
+def on_custom_callback(S, V, st, now):
+    text = sval(V, "cb_phrase")
+    consume(V, ("presence", "cb_phrase", "q_kind"))
+    tp = S.get("third_party") or {}
+    today = now.date()
+    d, _ = parse_day_phrase(S, text, today)
+    tm = parse_time(text)
+    if d is not None or tm:
+        d = d or (D.fromisoformat(st["cb_day"]) if st.get("cb_day") else today)
+        st["cb_day"] = d.isoformat()
+        if tm and callback_ok(S, d, tm, now):
+            st["cb"] = [d.isoformat(), tm]
+            return call_tool(S, V, st, "schedule_callback", {"date": d.isoformat(), "time": tm})
+    st["cb_asks"] = int(st.get("cb_asks") or 0) + 1
+    if st["cb_asks"] >= int(tp.get("max_asks") or 2):
+        return finish(S, V, st, "no_callback", phrase(S, "no_callback"))
+    days = allowed_callback_days(S, now)
+    ask(V, st, "talk_pre", phrase(S, "callback_other_time", days=" or ".join(fmt_date(x, today) for x in days),
+                                  start=tp.get("window_start") or "", end=tp.get("window_end") or "", address=address(S, V)))
 
 
 # ---------------------------------------------------------------- requests that can come at any time
@@ -1452,6 +1501,24 @@ def brain(V, S):
         V["next_step"] = "talk_main_llm" if (load_state(V) or {}).get("phase") == "main" else "talk_pre_llm"
 
 
+def custom_hit(S, V, st, phase):
+    name = sval(V, "custom")
+    if not name:
+        return False
+    consume(V, ("custom",))
+    c = custom_by_name(S, name)
+    if c is None or phase == "custom_cb":
+        return False
+    verified = bool(st.get("verified"))
+    when = c.get("applies_when") or "any"
+    if (when == "before_verification" and verified) or (when == "after_verification" and not verified):
+        return False
+    node = {"presence": "talk_pre", "third_party": "talk_pre", "identity": "talk_id"}.get(phase, "talk_main")
+    consume(V, ("presence", "q_kind", "cb_phrase", "id_answer", "id_iso", "id_reply", "reply", "date_phrase", "amount", "applies_to_all"))
+    handle_custom(S, V, st, c, node)
+    return True
+
+
 def run(V, S):
     now = parse_now(S, V)
     st = load_state(V)
@@ -1478,7 +1545,7 @@ def run(V, S):
     elif pend == "tool:schedule_callback":
         d = tool_result(V, "schedule_callback", st)
         if tool_ok(S, "schedule_callback", d):
-            finish(S, V, st, "callback", phrase(S, "callback_confirm", date=fmt_date(D.fromisoformat(st["cb"][0]), today), time=st["cb"][1]))
+            finish(S, V, st, st["situation"] if str(st.get("situation") or "").startswith("custom:") else "callback", phrase(S, "callback_confirm", date=fmt_date(D.fromisoformat(st["cb"][0]), today), time=st["cb"][1]))
         else:
             st["cb_fail"] = int(st.get("cb_fail") or 0) + 1
             if st["cb_fail"] <= 1:
@@ -1487,6 +1554,10 @@ def run(V, S):
                 finish(S, V, st, "no_callback", phrase(S, "no_callback"))
     elif pend == "tool:transfer_to_agent":
         finish(S, V, st, st.get("situation") or "", phrase(S, "transfer_announce"))
+    elif custom_hit(S, V, st, phase):
+        pass
+    elif phase == "custom_cb":
+        on_custom_callback(S, V, st, now)
     elif phase == "presence":
         on_presence(S, V, st, now)
     elif phase == "third_party":

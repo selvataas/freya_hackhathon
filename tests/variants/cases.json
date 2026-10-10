@@ -1,88 +1,818 @@
 [
- {"id": "NW-01", "spec": "nordwind", "title": "card, 'next Tuesday' means the coming Tuesday",
-  "variables": {"given_name": "Ana", "surname": "Lind", "salutation": "Mrs", "call_time": "2026-11-04T09:30"},
-  "identity": {"postcode": "N4 7QX", "birth_year": "1980"},
-  "products": [{"id": "a1", "kind": "card", "last_digits": "1234", "overdue_amount": 300.0, "days_overdue": 6, "min_due": 90.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "N4 7QX"}, {"id_reply": "answer", "id_answer": "nineteen eighty"},
-             {"reply": "propose", "date_phrase": "next Tuesday"}, {"reply": "yes"}],
-  "expected": {"outcome": "committed", "reason": null, "promises": [{"product_id": "a1", "amount": 300.0, "date": "2026-11-10"}], "notes": [], "callbacks": [], "transfers": []}},
- {"id": "NW-02", "spec": "nordwind", "title": "second tier: attempt 1 next business day, attempt 2 floor on the 5th business day",
-  "variables": {"given_name": "Ola", "surname": "Berg", "salutation": "Mr", "call_time": "2026-11-04T09:30"},
-  "identity": {"postcode": "B2 9LL", "birth_year": "1975"},
-  "products": [{"id": "a1", "kind": "overdraft", "overdue_amount": 800.0, "days_overdue": 20, "monthly_payment": 200.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "B2 9LL"}, {"id_reply": "answer", "id_answer": "1975"},
-             {"reply": "no"}, {"reply": "no"}, {"reply": "yes"}, {"reply": "yes"}],
-  "expected": {"outcome": "committed", "reason": null, "promises": [{"product_id": "a1", "amount": 200.0, "date": "2026-11-11"}], "notes": [], "callbacks": [], "transfers": []}},
- {"id": "NW-03", "spec": "nordwind", "title": "two accounts, one date after the loan's limit",
-  "variables": {"given_name": "Eva", "surname": "Holm", "salutation": "Ms", "call_time": "2026-11-04T09:30"},
-  "identity": {"postcode": "C1 1AA", "birth_year": "1990"},
-  "products": [{"id": "a1", "kind": "card", "last_digits": "5555", "overdue_amount": 150.0, "days_overdue": 5, "min_due": 45.0},
-               {"id": "a2", "kind": "car_loan", "overdue_amount": 600.0, "days_overdue": 30, "monthly_payment": 300.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "C1 1AA"}, {"id_reply": "answer", "id_answer": "1990"},
-             {"reply": "propose", "date_phrase": "18 November", "applies_to_all": "yes"}, {"reply": "yes"}],
-  "expected": {"outcome": "committed", "reason": null, "promises": [{"product_id": "a1", "amount": 150.0, "date": "2026-11-18"}, {"product_id": "a2", "amount": 600.0, "date": "2026-11-11"}], "notes": [], "callbacks": [], "transfers": []}},
- {"id": "NW-04", "spec": "nordwind", "title": "asking what the call is about is not a refusal; a closing day moves to the day before",
-  "variables": {"given_name": "Ana", "surname": "Lind", "salutation": "Mrs", "call_time": "2026-11-04T09:30"},
-  "identity": {"postcode": "N4 7QX", "birth_year": "1980"},
-  "products": [{"id": "a1", "kind": "card", "last_digits": "1234", "overdue_amount": 300.0, "days_overdue": 6, "min_due": 90.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "asks_purpose", "q_kind": "purpose"}, {"id_reply": "asks_purpose", "q_kind": "purpose"},
-             {"id_reply": "answer", "id_answer": "N4 7QX"}, {"id_reply": "answer", "id_answer": "1980"},
-             {"reply": "propose", "date_phrase": "17 November"}, {"reply": "yes"}, {"reply": "yes"}],
-  "expected": {"outcome": "committed", "reason": null, "promises": [{"product_id": "a1", "amount": 300.0, "date": "2026-11-16"}], "notes": [], "callbacks": [], "transfers": []}},
- {"id": "NW-05", "spec": "nordwind", "title": "two wrong answers end the check",
-  "variables": {"given_name": "Ana", "surname": "Lind", "salutation": "Mrs", "call_time": "2026-11-04T09:30"},
-  "identity": {"postcode": "N4 7QX", "birth_year": "1980"},
-  "products": [{"id": "a1", "kind": "card", "last_digits": "1234", "overdue_amount": 300.0, "days_overdue": 6, "min_due": 90.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "N4 7QY"}, {"id_reply": "answer", "id_answer": "N4 7QZ"}],
-  "expected": {"outcome": "unverified", "reason": "failed", "promises": [], "notes": [], "callbacks": [], "transfers": []}},
- {"id": "NW-06", "spec": "nordwind", "title": "hardship accepted: care team",
-  "variables": {"given_name": "Ola", "surname": "Berg", "salutation": "Mr", "call_time": "2026-11-04T09:30"},
-  "identity": {"postcode": "B2 9LL", "birth_year": "1975"},
-  "products": [{"id": "a1", "kind": "overdraft", "overdue_amount": 800.0, "days_overdue": 20, "monthly_payment": 200.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "B2 9LL"}, {"id_reply": "answer", "id_answer": "1975"},
-             {"reply": "hardship"}, {"reply": "yes"}],
-  "expected": {"outcome": "handed_over", "reason": "care", "promises": [], "notes": [], "callbacks": [], "transfers": [{"queue": "care"}]}},
- {"id": "NW-07", "spec": "nordwind", "title": "a relative: callback only on the next business day",
-  "variables": {"given_name": "Ana", "surname": "Lind", "salutation": "Mrs", "call_time": "2026-11-04T09:30"},
-  "identity": {"postcode": "N4 7QX", "birth_year": "1980"},
-  "products": [{"id": "a1", "kind": "card", "last_digits": "1234", "overdue_amount": 300.0, "days_overdue": 6, "min_due": 90.0}],
-  "script": [{"presence": "other_person", "cb_phrase": "this afternoon at three"}, {"presence": "other_person", "cb_phrase": "tomorrow at ten"}],
-  "expected": {"outcome": "no_contact", "reason": "callback", "promises": [], "notes": [], "callbacks": [{"date": "2026-11-05", "time": "10:00"}], "transfers": []}},
-
- {"id": "HS-01", "spec": "halden", "title": "standard segment, attempt 1 on Friday",
-  "variables": {"first_name": "Kari", "last_name": "Dahl", "title": "Ms", "now": "2026-11-10T14:00"},
-  "identity": {"date_of_birth": "1985-02-03", "account_last4": "7731"},
-  "products": [{"product_id": "p1", "type": "credit_card", "card_last4": "4400", "past_due": 250.0, "days_late": 5, "minimum_payment": 75.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "3/2/1985"}, {"id_reply": "answer", "id_answer": "seven seven three one"},
-             {"reply": "no"}, {"reply": "yes"}, {"reply": "yes"}],
-  "expected": {"outcome": "PTP", "reason": null, "promises": [{"product_id": "p1", "amount": 250.0, "date": "2026-11-13"}], "notes": [], "callbacks": [], "transfers": []}},
- {"id": "HS-02", "spec": "halden", "title": "the memo: standard limit is the 8th working day, with the new holiday",
-  "variables": {"first_name": "Kari", "last_name": "Dahl", "title": "Ms", "now": "2026-11-10T14:00"},
-  "identity": {"date_of_birth": "1985-02-03", "account_last4": "7731"},
-  "products": [{"product_id": "p1", "type": "credit_card", "card_last4": "4400", "past_due": 250.0, "days_late": 5, "minimum_payment": 75.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "3 February 1985"}, {"id_reply": "answer", "id_answer": "7731"},
-             {"reply": "propose", "date_phrase": "the 25th"}, {"reply": "yes"}, {"reply": "yes"}],
-  "expected": {"outcome": "PTP", "reason": null, "promises": [{"product_id": "p1", "amount": 250.0, "date": "2026-11-24"}], "notes": [], "callbacks": [], "transfers": []}},
- {"id": "HS-03", "spec": "halden", "title": "the memo: callback window ends at 16:00",
-  "variables": {"first_name": "Kari", "last_name": "Dahl", "title": "Ms", "now": "2026-11-10T14:00"},
-  "identity": {"date_of_birth": "1985-02-03", "account_last4": "7731"},
-  "products": [{"product_id": "p1", "type": "credit_card", "card_last4": "4400", "past_due": 250.0, "days_late": 5, "minimum_payment": 75.0}],
-  "script": [{"presence": "other_person", "cb_phrase": "today at 5 pm"}, {"presence": "other_person", "cb_phrase": "at three this afternoon"}],
-  "expected": {"outcome": "NOCON", "reason": "CB", "promises": [], "notes": [], "callbacks": [{"date": "2026-11-10", "time": "15:00"}], "transfers": []}},
- {"id": "HS-04", "spec": "halden", "title": "the memo: hardship gets no transfer, a note HARD",
-  "variables": {"first_name": "Per", "last_name": "Vik", "title": "Mr", "now": "2026-11-10T14:00"},
-  "identity": {"date_of_birth": "1970-12-30", "account_last4": "0042"},
-  "products": [{"product_id": "p1", "type": "mortgage", "past_due": 1900.0, "days_late": 40, "instalment_amount": 950.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "thirtieth of December nineteen seventy"}, {"id_reply": "answer", "id_answer": "zero zero four two"},
-             {"reply": "hardship"}],
-  "expected": {"outcome": "NOPTP", "reason": "HARD", "promises": [], "notes": [{"product_id": "p1", "reason": "HARD"}], "callbacks": [], "transfers": []}},
- {"id": "HS-05", "spec": "halden", "title": "three products: one paid, one disputed, one promised",
-  "variables": {"first_name": "Per", "last_name": "Vik", "title": "Mr", "now": "2026-11-10T14:00"},
-  "identity": {"date_of_birth": "1970-12-30", "account_last4": "0042"},
-  "products": [{"product_id": "p1", "type": "credit_card", "card_last4": "9090", "past_due": 120.0, "days_late": 3, "minimum_payment": 40.0},
-               {"product_id": "p2", "type": "personal_loan", "past_due": 500.0, "days_late": 20, "instalment_amount": 250.0},
-               {"product_id": "p3", "type": "mortgage", "past_due": 1900.0, "days_late": 40, "instalment_amount": 950.0}],
-  "script": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "30/12/1970"}, {"id_reply": "answer", "id_answer": "0042"},
-             {"reply": "no"}, {"reply": "already_paid"}, {"reply": "dispute"}, {"reply": "yes"}, {"reply": "yes"}],
-  "expected": {"outcome": "PTP", "reason": null, "promises": [{"product_id": "p3", "amount": 1900.0, "date": "2026-11-13"}], "notes": [{"product_id": "p1", "reason": "PAID"}, {"product_id": "p2", "reason": "DISP"}], "callbacks": [], "transfers": []}}
+ {
+  "id": "NW-01",
+  "spec": "nordwind",
+  "title": "card, 'next Tuesday' means the coming Tuesday",
+  "variables": {
+   "given_name": "Ana",
+   "surname": "Lind",
+   "salutation": "Mrs",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "N4 7QX",
+   "birth_year": "1980"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "card",
+    "last_digits": "1234",
+    "overdue_amount": 300.0,
+    "days_overdue": 6,
+    "min_due": 90.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "N4 7QX"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "nineteen eighty"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "next Tuesday"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "committed",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "a1",
+     "amount": 300.0,
+     "date": "2026-11-10"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "NW-02",
+  "spec": "nordwind",
+  "title": "second tier: attempt 1 next business day, attempt 2 floor on the 5th business day",
+  "variables": {
+   "given_name": "Ola",
+   "surname": "Berg",
+   "salutation": "Mr",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "B2 9LL",
+   "birth_year": "1975"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "overdraft",
+    "overdue_amount": 800.0,
+    "days_overdue": 20,
+    "monthly_payment": 200.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "B2 9LL"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "1975"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "committed",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "a1",
+     "amount": 200.0,
+     "date": "2026-11-11"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "NW-03",
+  "spec": "nordwind",
+  "title": "two accounts, one date after the loan's limit",
+  "variables": {
+   "given_name": "Eva",
+   "surname": "Holm",
+   "salutation": "Ms",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "C1 1AA",
+   "birth_year": "1990"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "card",
+    "last_digits": "5555",
+    "overdue_amount": 150.0,
+    "days_overdue": 5,
+    "min_due": 45.0
+   },
+   {
+    "id": "a2",
+    "kind": "car_loan",
+    "overdue_amount": 600.0,
+    "days_overdue": 30,
+    "monthly_payment": 300.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "C1 1AA"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "1990"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "18 November",
+    "applies_to_all": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "committed",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "a1",
+     "amount": 150.0,
+     "date": "2026-11-18"
+    },
+    {
+     "product_id": "a2",
+     "amount": 600.0,
+     "date": "2026-11-11"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "NW-04",
+  "spec": "nordwind",
+  "title": "asking what the call is about is not a refusal; a closing day moves to the day before",
+  "variables": {
+   "given_name": "Ana",
+   "surname": "Lind",
+   "salutation": "Mrs",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "N4 7QX",
+   "birth_year": "1980"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "card",
+    "last_digits": "1234",
+    "overdue_amount": 300.0,
+    "days_overdue": 6,
+    "min_due": 90.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "asks_purpose",
+    "q_kind": "purpose"
+   },
+   {
+    "id_reply": "asks_purpose",
+    "q_kind": "purpose"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "N4 7QX"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "1980"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "17 November"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "committed",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "a1",
+     "amount": 300.0,
+     "date": "2026-11-16"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "NW-05",
+  "spec": "nordwind",
+  "title": "two wrong answers end the check",
+  "variables": {
+   "given_name": "Ana",
+   "surname": "Lind",
+   "salutation": "Mrs",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "N4 7QX",
+   "birth_year": "1980"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "card",
+    "last_digits": "1234",
+    "overdue_amount": 300.0,
+    "days_overdue": 6,
+    "min_due": 90.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "N4 7QY"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "N4 7QZ"
+   }
+  ],
+  "expected": {
+   "outcome": "unverified",
+   "reason": "failed",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "NW-06",
+  "spec": "nordwind",
+  "title": "hardship accepted: care team",
+  "variables": {
+   "given_name": "Ola",
+   "surname": "Berg",
+   "salutation": "Mr",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "B2 9LL",
+   "birth_year": "1975"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "overdraft",
+    "overdue_amount": 800.0,
+    "days_overdue": 20,
+    "monthly_payment": 200.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "B2 9LL"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "1975"
+   },
+   {
+    "reply": "hardship"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "handed_over",
+   "reason": "care",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "care"
+    }
+   ]
+  }
+ },
+ {
+  "id": "NW-07",
+  "spec": "nordwind",
+  "title": "a relative: callback only on the next business day",
+  "variables": {
+   "given_name": "Ana",
+   "surname": "Lind",
+   "salutation": "Mrs",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "N4 7QX",
+   "birth_year": "1980"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "card",
+    "last_digits": "1234",
+    "overdue_amount": 300.0,
+    "days_overdue": 6,
+    "min_due": 90.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "this afternoon at three"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "tomorrow at ten"
+   }
+  ],
+  "expected": {
+   "outcome": "no_contact",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-11-05",
+     "time": "10:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "HS-01",
+  "spec": "halden",
+  "title": "standard segment, attempt 1 on Friday",
+  "variables": {
+   "first_name": "Kari",
+   "last_name": "Dahl",
+   "title": "Ms",
+   "now": "2026-11-10T14:00"
+  },
+  "identity": {
+   "date_of_birth": "1985-02-03",
+   "account_last4": "7731"
+  },
+  "products": [
+   {
+    "product_id": "p1",
+    "type": "credit_card",
+    "card_last4": "4400",
+    "past_due": 250.0,
+    "days_late": 5,
+    "minimum_payment": 75.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "3/2/1985"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "seven seven three one"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "PTP",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 250.0,
+     "date": "2026-11-13"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "HS-02",
+  "spec": "halden",
+  "title": "the memo: standard limit is the 8th working day, with the new holiday",
+  "variables": {
+   "first_name": "Kari",
+   "last_name": "Dahl",
+   "title": "Ms",
+   "now": "2026-11-10T14:00"
+  },
+  "identity": {
+   "date_of_birth": "1985-02-03",
+   "account_last4": "7731"
+  },
+  "products": [
+   {
+    "product_id": "p1",
+    "type": "credit_card",
+    "card_last4": "4400",
+    "past_due": 250.0,
+    "days_late": 5,
+    "minimum_payment": 75.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "3 February 1985"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "7731"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "the 25th"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "PTP",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 250.0,
+     "date": "2026-11-24"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "HS-03",
+  "spec": "halden",
+  "title": "the memo: callback window ends at 16:00",
+  "variables": {
+   "first_name": "Kari",
+   "last_name": "Dahl",
+   "title": "Ms",
+   "now": "2026-11-10T14:00"
+  },
+  "identity": {
+   "date_of_birth": "1985-02-03",
+   "account_last4": "7731"
+  },
+  "products": [
+   {
+    "product_id": "p1",
+    "type": "credit_card",
+    "card_last4": "4400",
+    "past_due": 250.0,
+    "days_late": 5,
+    "minimum_payment": 75.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "today at 5 pm"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "at three this afternoon"
+   }
+  ],
+  "expected": {
+   "outcome": "NOCON",
+   "reason": "CB",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-11-10",
+     "time": "15:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "HS-04",
+  "spec": "halden",
+  "title": "the memo: hardship gets no transfer, a note HARD",
+  "variables": {
+   "first_name": "Per",
+   "last_name": "Vik",
+   "title": "Mr",
+   "now": "2026-11-10T14:00"
+  },
+  "identity": {
+   "date_of_birth": "1970-12-30",
+   "account_last4": "0042"
+  },
+  "products": [
+   {
+    "product_id": "p1",
+    "type": "mortgage",
+    "past_due": 1900.0,
+    "days_late": 40,
+    "instalment_amount": 950.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "thirtieth of December nineteen seventy"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "zero zero four two"
+   },
+   {
+    "reply": "hardship"
+   }
+  ],
+  "expected": {
+   "outcome": "NOPTP",
+   "reason": "HARD",
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "HARD"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "HS-05",
+  "spec": "halden",
+  "title": "three products: one paid, one disputed, one promised",
+  "variables": {
+   "first_name": "Per",
+   "last_name": "Vik",
+   "title": "Mr",
+   "now": "2026-11-10T14:00"
+  },
+  "identity": {
+   "date_of_birth": "1970-12-30",
+   "account_last4": "0042"
+  },
+  "products": [
+   {
+    "product_id": "p1",
+    "type": "credit_card",
+    "card_last4": "9090",
+    "past_due": 120.0,
+    "days_late": 3,
+    "minimum_payment": 40.0
+   },
+   {
+    "product_id": "p2",
+    "type": "personal_loan",
+    "past_due": 500.0,
+    "days_late": 20,
+    "instalment_amount": 250.0
+   },
+   {
+    "product_id": "p3",
+    "type": "mortgage",
+    "past_due": 1900.0,
+    "days_late": 40,
+    "instalment_amount": 950.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "30/12/1970"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "0042"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "already_paid"
+   },
+   {
+    "reply": "dispute"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "PTP",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p3",
+     "amount": 1900.0,
+     "date": "2026-11-13"
+    }
+   ],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "PAID"
+    },
+    {
+     "product_id": "p2",
+     "reason": "DISP"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "NW-08",
+  "spec": "nordwind",
+  "title": "driving after verification: no_contact / busy, no callback",
+  "variables": {
+   "given_name": "Ana",
+   "surname": "Lind",
+   "salutation": "Mrs",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "N4 7QX",
+   "birth_year": "1980"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "card",
+    "last_digits": "1234",
+    "overdue_amount": 300.0,
+    "days_overdue": 6,
+    "min_due": 90.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "N4 7QX"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "1980"
+   },
+   {
+    "reply": "other",
+    "custom_reason": "busy"
+   }
+  ],
+  "expected": {
+   "outcome": "no_contact",
+   "reason": "busy",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "NW-09",
+  "spec": "nordwind",
+  "title": "driving before verification: no_contact / busy",
+  "variables": {
+   "given_name": "Ana",
+   "surname": "Lind",
+   "salutation": "Mrs",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "N4 7QX",
+   "birth_year": "1980"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "card",
+    "last_digits": "1234",
+    "overdue_amount": 300.0,
+    "days_overdue": 6,
+    "min_due": 90.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed",
+    "custom_reason": "busy"
+   }
+  ],
+  "expected": {
+   "outcome": "no_contact",
+   "reason": "busy",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ }
 ]

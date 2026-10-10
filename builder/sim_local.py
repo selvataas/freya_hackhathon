@@ -150,7 +150,11 @@ def run_case(spec, cid, verbose=False):
             if not script:
                 log.append(("USER", "(hangs up)"))
                 break
-            turn = script.pop(0)
+            turn = dict(script.pop(0))
+            if "custom_reason" in turn:
+                # the scripts cannot know the name the extraction chose: pick the custom situation by its reason
+                want = turn.pop("custom_reason")
+                turn["custom"] = next((c["name"] for c in spec.get("custom_situations") or [] if c.get("reason") == want), "none")
             log.append(("USER", json.dumps(turn)))
             V.update(turn)
         elif ns.startswith("do_"):

@@ -5,7 +5,7 @@ the LLM maps whatever a brief calls them onto these words.
 """
 import copy, re
 
-SCHEMA_VERSION = "8"
+SCHEMA_VERSION = "9"
 
 SITUATIONS = ["promise_recorded", "already_paid", "transfer_restructuring", "transfer_human", "transfer_support",
               "refused", "hardship", "dispute", "service_error", "id_failed", "id_declined", "callback",
@@ -17,6 +17,7 @@ ATTEMPT_AMOUNTS = ["full", "floor", "full_or_floor_if_too_much"]
 ANSWER_TYPES = ["date", "digits", "year", "text"]
 DATE_ORDERS = ["DMY", "MDY", "YMD"]
 NEXT_WEEKDAY = ["following_week", "next_occurrence"]
+CUSTOM_WHEN = ["before_verification", "after_verification", "any"]
 CALLBACK_DAYS = ["today_or_next_business_day", "today_only", "next_business_day_only", "business_days_within_n"]
 NON_BUSINESS = ["offer_next_business_day", "offer_previous_business_day"]
 EARLIEST = ["today", "tomorrow"]
@@ -64,11 +65,12 @@ PHRASES = {
     "changes_after_record": "Said when the customer wants to change a promise that is already recorded.",
     "already_paid": "Said when the customer says they already paid.",
     "dispute_ack": "Said when the customer says the debt is not theirs, without arguing.",
-    "hardship_sympathy": "One short sentence of sympathy for illness, a death in the family or job loss.",
+    "hardship_sympathy": "One short sentence of sympathy for the hardship situations the brief names.",
     "hardship_offer_transfer": "Offers to connect the customer with the team that helps in hardship.",
     "service_error": "Said when a promise could not be recorded after the retries. Use <product>.",
     "goodbye": "Thanks the customer and says goodbye. Said last in every call.",
     "not_understood": "Said when the agent did not catch the answer, before asking again.",
+    "purpose_answer": "Answer when the customer asks what the call is about before identity is verified. Gives no reason for the call.",
     "third_party_privacy": "Said to someone else on the line who asks what the call is about. Gives no reason. Use <address>.",
     "ask_rest": "Asks for the rest of an answer the customer gave only in part.",
     "wrong_answer": "Said after a wrong security answer, before asking the same question again. Never reveals the right answer.",
@@ -173,14 +175,14 @@ SCHEMA = O({
     }),
     "products": A(O({
         "type": S("string", "A product type value from get_account."),
-        "spoken_template": S("string", "How the product is named in words, with get_account field names in curly braces, e.g. credit card ending {card_last4}."),
+        "spoken_template": S("string", "How the product is named in words, with get_account field names in curly braces, e.g. 'savings account ending {last4}'."),
         "floor_field": S("string", "The get_account field that holds the lowest amount that may be accepted for this type."),
     })),
     "bands": A(O({
         "name": S("string"),
         "days_late_min": S("integer"), "days_late_max": S("integer"),
         "deadline_unit": S("string", None, DEADLINE_UNITS),
-        "deadline_n": S("integer", "e.g. 12 for the 12th business day after today."),
+        "deadline_n": S("integer", "e.g. 4 for the 4th business day after today."),
         "attempts": S("integer", "Persuasion attempts allowed."),
     })),
     "promise_date": O({
@@ -210,7 +212,7 @@ SCHEMA = O({
         "dispute": O({"enabled": S("boolean"), "trigger_examples": A(S("string"))}),
         "restructuring": O({"enabled": S("boolean"), "trigger_examples": A(S("string")), "queue": N("string")}),
         "human": O({"enabled": S("boolean"), "queue": N("string"), "ask_help_first_times": S("integer")}),
-        "not_talking": O({"max_times": S("integer", "How many times 'I do not want to talk' closes the call.")}),
+        "not_talking": O({"max_times": S("integer", "After how many 'I do not want to talk' the call closes. 0 if the brief has no such rule.")}),
     }),
     "promise": O({"retries": S("integer", "How many times a failed promise is tried again.")}),
     "outcomes": A(O({
@@ -230,8 +232,20 @@ SCHEMA = O({
                          "For every response role, the response field name the tool API uses."),
     "tool_constants": A(O({"tool": S("string"), "field": S("string"), "value": S("string")}),
                         "Request fields that always get the same value, if the brief says so."),
+    "custom_situations": A(O({
+        "name": S("string", "A short snake_case name."),
+        "trigger_examples": A(S("string"), "What the customer says that starts it."),
+        "say_text": S("string", "What the agent says when it happens."),
+        "verbatim": S("boolean", "true only if the brief gives the exact wording"),
+        "outcome": N("string", "close_call outcome value when the call ends because of it; null when the call goes on."),
+        "reason": N("string", "close_call reason value, or null."),
+        "continue_for_promise": S("boolean", "true: say the text and carry on with the call (a promise can still be taken); false: the call ends."),
+        "needs_callback": S("boolean", "true: ask when to call back and book a callback before closing."),
+        "callback_ask_text": N("string", "The callback question, when needs_callback."),
+        "applies_when": S("string", None, CUSTOM_WHEN),
+    }), "Situations of the brief that no field above covers: a trigger, what to say, and how the call ends."),
     "unplaced_rules": A(O({"quote": S("string", "The rule, word for word from the brief."), "note": S("string")}),
-                        "Every rule of the brief that none of the fields above can hold."),
+                        "Only rules that no field above, including custom_situations, holds."),
 })
 
 
@@ -388,6 +402,23 @@ def normalize(spec, tools, warn):
         if flds and f.get("field") not in flds:
             warn(f"tool field {f} not in the tool API; using the role name")
             f["field"] = f.get("role")
+    cs = []
+    for c in s.get("custom_situations") or []:
+        if not isinstance(c, dict) or not c.get("name") or not c.get("say_text"):
+            warn(f"custom situation {c} incomplete; dropped")
+            continue
+        c["name"] = re.sub(r"[^a-z0-9_]", "_", str(c["name"]).lower())[:40]
+        pick(c, "applies_when", CUSTOM_WHEN, "any", "custom_situations")
+        if c.get("outcome") and outcomes_enum and c["outcome"] not in outcomes_enum:
+            warn(f"custom situation {c['name']}: outcome {c['outcome']!r} not in the tool API; it goes on instead of closing")
+            c["outcome"], c["continue_for_promise"] = None, True
+        if not c.get("outcome") and not c.get("continue_for_promise"):
+            warn(f"custom situation {c['name']}: ends the call but has no outcome; it goes on instead")
+            c["continue_for_promise"] = True
+        if c.get("needs_callback") and "schedule_callback" not in tools:
+            c["needs_callback"] = False
+        cs.append(c)
+    s["custom_situations"] = cs
     s.setdefault("unplaced_rules", [])
     return s
 

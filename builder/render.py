@@ -191,7 +191,20 @@ def _examples(lst):
     return (" (for example: " + "; ".join(lst[:6]) + ")") if lst else ""
 
 
+def _custom_field(spec, phase):
+    want = ("before_verification", "any") if phase in ("talk_pre", "talk_id") else ("after_verification", "any")
+    cs = [c for c in spec.get("custom_situations") or [] if c.get("applies_when") in want]
+    if not cs:
+        return []
+    desc = "; ".join(c["name"] + " = " + "; ".join(str(x) for x in (c.get("trigger_examples") or [])[:5]) for c in cs)
+    return [_ex("custom", "string", "Only if the LAST message is one of these situations: " + desc + ". Otherwise none.", [c["name"] for c in cs])]
+
+
 def extraction(spec, phase):
+    return _extraction(spec, phase) + _custom_field(spec, phase)
+
+
+def _extraction(spec, phase):
     hs, rq = spec.get("hardship") or {}, spec.get("requests") or {}
     q_kind = _ex("q_kind", "string", "Only if the customer's LAST message asks the agent a question: ai = asks if they talk to a robot, a machine or an AI; "
                  "scam = asks if this is a scam or fraud; purpose = asks what the call is about or who is calling; other = any other question; none = no question.",

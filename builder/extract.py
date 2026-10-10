@@ -5,7 +5,7 @@ from spec_schema import SCHEMA, SCHEMA_VERSION, SITUATIONS, NOTE_SITUATIONS, TOO
 
 MODEL = os.environ.get("LLM_MODEL") or os.environ.get("BUILDER_MODEL") or "claude-opus-5-5"
 EFFORT = os.environ.get("BUILDER_EFFORT", "high")
-PROMPT_VERSION = "5"
+PROMPT_VERSION = "6"
 CACHE = pathlib.Path(__file__).resolve().parent.parent / "cache"
 
 INSTRUCTIONS = f"""You read a bank's specification ("brief") for an outbound collections phone call, and the bank's tool API (OpenAPI).
@@ -48,7 +48,13 @@ In response_fields give one row per (tool, role) with the response field name:
 
 Multi product: note_reasons maps these situations to the reason values of the note tool: {json.dumps(NOTE_SITUATIONS)}.
 
-unplaced_rules: every rule of the brief that the fields above cannot express, quoted word for word. Do not put rules there that a field already holds.
+custom_situations: a situation of the brief that none of the fields above handles (the customer says something that needs its own
+words and its own ending, for example a reason to end the call with its own outcome). Give its triggers, the text to say, and how the call goes on.
+Do not repeat situations the fields already cover (already paid, dispute, hardship, restructuring, a human, not talking, third party, wrong number, deceased).
+
+unplaced_rules: only a rule that no field above holds, custom_situations included, quoted word for word. Check every field before adding a rule:
+a rule that a field already expresses (attempts, dates, amounts, identity, confirmation, recording, notes, outcomes, phrases) must not be listed.
+Most briefs leave this list short or empty.
 """
 
 
