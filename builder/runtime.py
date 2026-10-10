@@ -11,8 +11,6 @@ import json, re, datetime
 D = datetime.date
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
-MONTH_ABBR = dict((m[:3], i + 1) for i, m in enumerate(MONTHS))
-MONTH_ABBR["sept"] = 9
 UNITS = dict(zero=0, oh=0, o=0, nought=0, one=1, two=2, three=3, four=4, five=5, six=6, seven=7, eight=8, nine=9, ten=10,
              eleven=11, twelve=12, thirteen=13, fourteen=14, fifteen=15, sixteen=16, seventeen=17, eighteen=18, nineteen=19)
 TENS = dict(twenty=20, thirty=30, forty=40, fifty=50, sixty=60, seventy=70, eighty=80, ninety=90)
@@ -61,7 +59,8 @@ def phrase(S, key, **kw):
     t = t or ""
     for k, v in kw.items():
         t = t.replace("<" + k + ">", str(v))
-    return t.strip()
+    t = re.sub(r"\s{2,}", " ", t)
+    return re.sub(r"\s+([.,;:?!])", r"\1", t).strip()
 
 
 def fill_template(t, values):
@@ -238,33 +237,44 @@ def num_token(w):
     return None
 
 
-def day_numbers(t):
-    # finds day-of-month numbers in digits or words, e.g. "26th", "twenty sixth", "the 3rd"
+def day_numbers(t, cardinals=False):
+    # day-of-month numbers in digits or words: "26th", "twenty sixth", "the 3rd"; with cardinals also "fourteen"
     out = []
     toks = re.findall(r"[a-z]+|\d+(?:st|nd|rd|th)?", t.replace("-", " "))
     i = 0
     while i < len(toks):
         w = toks[i]
-        if w in TENS and i + 1 < len(toks) and (toks[i + 1] in ORD or toks[i + 1] in UNITS) and (ORD.get(toks[i + 1]) or UNITS.get(toks[i + 1]) or 0) < 10:
-            out.append(TENS[w] + (ORD.get(toks[i + 1]) or UNITS.get(toks[i + 1]))); i += 2; continue
+        nxt = toks[i + 1] if i + 1 < len(toks) else ""
+        unit = ORD.get(nxt) or (UNITS.get(nxt) if cardinals or nxt in ORD else None)
+        if w in TENS and TENS[w] in (20, 30) and unit is not None and 0 < unit < 10:
+            out.append(TENS[w] + unit); i += 2; continue
         n = num_token(w)
-        if n is not None and 1 <= n <= 31 and (re.match(r"^\d", w) or w in ORD):
+        if n is not None and 1 <= n <= 31 and (re.match(r"^\d", w) or w in ORD or (cardinals and w in UNITS)):
             out.append(n)
-        elif w in TENS and TENS[w] in (20, 30) and (i + 1 >= len(toks) or toks[i + 1] not in UNITS):
+        elif w in TENS and TENS[w] in (20, 30) and (cardinals or w == "thirtieth"):
             out.append(TENS[w])
+        elif w in ("twentieth", "thirtieth"):
+            out.append(ORD[w])
         i += 1
     return out
 
 
+MONTH_SHORT = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12}
+
+
 def find_month(t):
-    for w in re.findall(r"[a-z]+", t):
+    toks = re.findall(r"[a-z]+|\d+", t)
+    for i, w in enumerate(toks):
+        if w == "may":
+            # "may" is a month only next to a number: "3 May", "May 3rd", "may the 3rd"
+            near = toks[max(0, i - 2):i] + toks[i + 1:i + 3]
+            if any(re.match(r"^\d", x) or x in ORD or x in UNITS or x in TENS for x in near):
+                return 5
+            continue
         if w in MONTHS:
             return MONTHS.index(w) + 1
-        if w[:3] in MONTH_ABBR and len(w) <= 4 and w not in ("mar", "may", "jun") or w in ("sept",):
-            return MONTH_ABBR.get(w[:4] if w == "sept" else w[:3])
-    for w in re.findall(r"[a-z]+", t):
-        if w in ("mar", "jun", "jul", "aug", "oct", "nov", "dec", "jan", "feb", "apr", "sep"):
-            return MONTH_ABBR[w]
+        if w in MONTH_SHORT:
+            return MONTH_SHORT[w]
     return None
 
 
@@ -303,7 +313,7 @@ def parse_day_phrase(S, text, today):
     if re.search(r"\b(today|tonight|this evening|this afternoon|right now|now)\b", t):
         return today, "date"
     mon = find_month(t)
-    days = day_numbers(t)
+    days = day_numbers(t, cardinals=bool(mon))
     if mon and days:
         day = days[0]
         ym = re.search(r"\b(20\d\d)\b", t)
@@ -434,13 +444,14 @@ def parse_dob(text, order):
             return "ok", D(y, mo, d).isoformat()
         except Exception:
             return "bad", None
+    t2 = t2.replace("-", " ")
     mon = find_month(t2)
     year = parse_year_words(t2)
     t3 = re.sub(r"\b(19|20)\d\d\b", " ", t2)
     if year:
         # strip the year words so that "nineteen eighty-eight" does not look like a day
         t3 = re.sub(r"\b(nineteen|twenty|two thousand)(\s+(and\s+)?[a-z]+){0,2}\s*$", " ", t3)
-    days = day_numbers(t3)
+    days = day_numbers(t3, cardinals=True)
     if mon and days and year:
         try:
             return "ok", D(year, mon, days[0]).isoformat()
@@ -584,7 +595,7 @@ def plan_products(S, raw, today):
     return out
 
 
-# ---------------------------------------------------------------- state
+# ---------------------------------------------------------------- state and speaking
 
 def load_state(V):
     st = jload(V.get("st"), None)
@@ -596,29 +607,36 @@ def save(V, st):
 
 
 def address(S, V):
-    vals = dict((k, sval(V, k)) for k in ("title", "first_name", "last_name"))
+    vals = {}
     for k in list(V.keys()):
-        if isinstance(k, str) and k not in vals and len(k) < 40:
-            try:
-                vals[k] = sval(V, k)
-            except Exception:
-                pass
+        if isinstance(k, str) and len(k) < 40 and "." not in k:
+            vals[k] = sval(V, k)
     return fill_template((S.get("variables") or {}).get("address_template") or "{title} {last_name}", vals).strip()
 
 
-def say_fixed(V, st, node, text):
-    st["say"] = text
+def join(*parts):
+    return " ".join(p.strip() for p in parts if p and p.strip())
+
+
+def say(V, st, node, *parts):
+    """Every line the agent says is built here from the spec's phrases. The dialogue model is not asked to write it."""
+    text = join(*parts)
+    st["last_say"] = text
     V["say_line"] = text
     V["instruction"] = 'Say exactly: "' + text + '"'
     V["next_step"] = node + "_fixed"
     st["pending"] = node
 
 
-def say_llm(V, st, node, instruction):
-    V["instruction"] = instruction
-    V["say_line"] = ""
-    V["next_step"] = node + "_llm"
-    st["pending"] = node
+def repeat_last(V, st, node, *prefix):
+    say(V, st, node, *(list(prefix) + [st.get("last_ask") or st.get("last_say") or ""]))
+
+
+def ask(V, st, node, *parts):
+    # a line that ends in a question the customer must answer; kept for repeating
+    text = join(*parts)
+    st["last_ask"] = text
+    say(V, st, node, text)
 
 
 def call_tool(S, V, st, tool, values):
@@ -632,16 +650,14 @@ def call_tool(S, V, st, tool, values):
 
 
 def tool_result(V, tool):
-    raw = V.get("res_" + tool)
-    d = jload(raw, None)
+    d = jload(V.get("res_" + tool), None)
     return d if isinstance(d, dict) else None
 
 
 def tool_ok(S, tool, d):
     if not isinstance(d, dict):
         return False
-    k = resp_field(S, tool, "ok")
-    v = d.get(k, True)
+    v = d.get(resp_field(S, tool, "ok"), True)
     return not (v is False or str(v).lower() == "false") and not d.get("error")
 
 
@@ -649,12 +665,27 @@ def warn(st, msg):
     st.setdefault("warnings", []).append(msg[:200])
 
 
+def when_words(S, date_iso, today):
+    if date_iso == today.isoformat():
+        return phrase(S, "word_today") or "today"
+    return phrase(S, "word_on_date", date=fmt_date(D.fromisoformat(date_iso), today)) or ("on " + fmt_date(D.fromisoformat(date_iso), today))
+
+
+def answer_for_question(S, kind):
+    if kind == "ai":
+        return phrase(S, "ai_answer")
+    if kind == "scam":
+        return phrase(S, "scam_answer")
+    if kind == "other":
+        return phrase(S, "no_info")
+    return ""
+
+
 # ---------------------------------------------------------------- closing
 
 def set_final(S, V, st):
     """The outcome close_call sends. Updated on every run, so a call that ends early still closes sensibly."""
     sit = st.get("situation") or ""
-    outcome, reason = "", ""
     prods = st.get("products") or []
     recorded = [p for p in prods if p.get("status") == "recorded"]
     if sit.startswith("transfer_"):
@@ -664,21 +695,19 @@ def set_final(S, V, st):
     elif sit:
         outcome, reason = outcome_for(S, sit)
     elif prods:
-        mp = S.get("multi_product") or {}
         notes = [p.get("note_sit") or p.get("status") for p in prods]
         if notes and all(n == "already_paid" for n in notes):
             outcome, reason = outcome_for(S, "already_paid")
         else:
             first = ""
-            for p in prods:
-                s = p.get("note_sit") or p.get("status")
-                if s and s != "already_paid" and s not in ("open", "agreed"):
-                    first = s
+            for n in notes:
+                if n and n != "already_paid" and n in ("refused", "hardship", "dispute", "service_error"):
+                    first = n
                     break
             outcome, reason = outcome_for(S, first or "refused")
     elif st.get("verified"):
         outcome, reason = outcome_for(S, "refused")
-    elif st.get("phase") in ("identity",):
+    elif st.get("phase") == "identity":
         outcome, reason = outcome_for(S, "id_declined")
     else:
         outcome, reason = outcome_for(S, "unclear")
@@ -686,77 +715,58 @@ def set_final(S, V, st):
     V["final_reason"] = reason
 
 
-def finish(S, V, st, situation, lead=""):
+def finish(S, V, st, situation, *lead):
     if situation:
         st["situation"] = situation
     set_final(S, V, st)
-    goodbye = phrase(S, "goodbye")
-    text = (lead + " " + goodbye).strip() if goodbye and goodbye not in lead else lead.strip()
-    V["farewell"] = text or goodbye or "Goodbye."
+    V["farewell"] = join(*(list(lead) + [phrase(S, "goodbye")])) or "Goodbye."
     V["next_step"] = "bye"
     st["pending"] = "bye"
 
 
-# ---------------------------------------------------------------- phase: who is on the line
+# ---------------------------------------------------------------- requests that can come at any time
 
-def ask_identity_question(S, V, st, prefix=""):
-    q = phrase(S, "identity_question", address=address(S, V))
-    q = fill_template(q, dict((k, sval(V, k)) for k in ("title", "first_name", "last_name")))
-    say_fixed(V, st, "talk_pre", (prefix + " " + q).strip())
-
-
-def answer_for_question(S, kind):
-    if kind == "ai":
-        return phrase(S, "ai_answer")
-    if kind == "scam":
-        return phrase(S, "scam_answer")
-    if kind == "purpose":
-        return ""
-    if kind == "other":
-        return phrase(S, "no_info")
-    return ""
-
-
-def handle_human_request(S, V, st, node_after):
+def handle_human(S, V, st, node):
     req = (S.get("requests") or {}).get("human") or {}
-    if not req.get("enabled", True):
+    if not req.get("enabled", True) or not queue_for(S, "human"):
         return False
     st["human"] = int(st.get("human") or 0) + 1
     if st["human"] <= int(req.get("ask_help_first_times") or 0):
-        say_llm(V, st, node_after, 'The customer asked for a person. Ask once, in one sentence, whether you can help them first: "' + phrase(S, "human_offer_help") + '". Do not transfer yet.')
+        say(V, st, node, phrase(S, "human_offer_help"))
         return True
     st["situation"] = "transfer_human"
     st["transfer_queue"] = queue_for(S, "human")
+    for p in st.get("products") or []:
+        if p.get("status") in ("agreed", "confirmed"):
+            p["status"] = "open"
     call_tool(S, V, st, "transfer_to_agent", {"queue": st["transfer_queue"]})
     return True
 
 
-def not_talking(S, V, st, node_after, verified):
+def count_not_talking(S, st):
     st["not_talking"] = int(st.get("not_talking") or 0) + 1
-    mx = int(((S.get("requests") or {}).get("not_talking") or {}).get("max_times") or 2)
-    if st["not_talking"] >= mx:
-        if verified:
-            for p in st.get("products") or []:
-                if p.get("status") in ("open", "agreed"):
-                    p["status"] = "refused"
-            return "close_refused"
-        return "close_declined"
-    return "again"
+    return st["not_talking"] >= int(((S.get("requests") or {}).get("not_talking") or {}).get("max_times") or 2)
 
 
-def on_presence(S, V, st):
+# ---------------------------------------------------------------- phase: who is on the line
+
+def identity_question(S, V):
+    q = phrase(S, "identity_question", address=address(S, V))
+    return fill_template(q, dict((k, sval(V, k)) for k in list(V.keys()) if isinstance(k, str) and len(k) < 40))
+
+
+def on_presence(S, V, st, now):
     kind = sval(V, "presence")
     q = sval(V, "q_kind")
-    consume(V, ("presence", "q_kind"))
-    pres = S.get("presence") or {}
-    maxa = int(pres.get("max_asks") or 2)
+    cb = sval(V, "cb_phrase")
+    consume(V, ("presence", "q_kind", "cb_phrase"))
+    maxa = int((S.get("presence") or {}).get("max_asks") or 2)
     if kind == "deceased":
         return finish(S, V, st, "deceased", phrase(S, "condolence"))
     if kind == "wrong_number":
         return finish(S, V, st, "wrong_number", phrase(S, "wrong_number_ack"))
-    if kind == "human":
-        if handle_human_request(S, V, st, "talk_pre"):
-            return
+    if kind == "human" and handle_human(S, V, st, "talk_pre"):
+        return
     if kind == "confirmed":
         st["phase"] = "identity"
         st["q_index"] = 0
@@ -764,59 +774,61 @@ def on_presence(S, V, st):
     if kind == "other_person":
         st["phase"] = "third_party"
         st["cb_asks"] = 0
-        return say_llm(V, st, "talk_pre", "The person on the line is not " + address(S, V) + ". Do not say why you are calling and say nothing about any account. " + phrase(S, "third_party_ask", address=address(S, V)))
-    if kind == "not_talking":
-        r = not_talking(S, V, st, "talk_pre", False)
-        if r == "close_declined":
+        if cb:
+            V["cb_phrase"] = cb
+            return on_third_party(S, V, st, now)
+        return ask(V, st, "talk_pre", phrase(S, "third_party_ask", address=address(S, V)))
+    if kind in ("not_talking", "refuses"):
+        if count_not_talking(S, st):
             return finish(S, V, st, "id_declined")
     st["asks"] = int(st.get("asks") or 1) + 1
     if st["asks"] > maxa:
         return finish(S, V, st, "unclear")
-    ans = answer_for_question(S, q)
-    ask_identity_question(S, V, st, ans)
+    say(V, st, "talk_pre", answer_for_question(S, q), identity_question(S, V))
 
 
 def on_third_party(S, V, st, now):
     kind = sval(V, "presence")
-    phrase_raw = sval(V, "cb_phrase")
+    text = sval(V, "cb_phrase")
+    q = sval(V, "q_kind")
     consume(V, ("presence", "cb_phrase", "q_kind"))
     tp = S.get("third_party") or {}
+    who = address(S, V)
+    privacy = phrase(S, "third_party_privacy", address=who) if q in ("purpose", "other") or kind == "question" else ""
     if kind == "deceased":
         return finish(S, V, st, "deceased", phrase(S, "condolence"))
     if kind == "wrong_number":
         return finish(S, V, st, "wrong_number", phrase(S, "wrong_number_ack"))
-    if kind == "confirmed":
-        # the customer came to the phone
+    if kind == "confirmed" and not text:
         st["phase"] = "identity"
         st["q_index"] = 0
         return ask_question(S, V, st)
     if not tp.get("callback_enabled", True):
         return finish(S, V, st, "no_callback")
     today = now.date()
-    d, k = parse_day_phrase(S, phrase_raw, today)
-    tm = parse_time(phrase_raw)
-    if not phrase_raw or (d is None and not tm):
-        if kind == "refuses" or kind == "not_talking":
-            return finish(S, V, st, "no_callback")
+    d, _ = parse_day_phrase(S, text, today)
+    tm = parse_time(text)
+    if d is None and not tm:
+        if kind in ("refuses", "not_talking"):
+            return finish(S, V, st, "no_callback", phrase(S, "no_callback"))
         st["cb_vague"] = int(st.get("cb_vague") or 0) + 1
         if st["cb_vague"] > 2:
-            return finish(S, V, st, "no_callback")
-        return say_llm(V, st, "talk_pre", "Do not say why you are calling. Ask on which day and at what time " + address(S, V) + " can be reached.")
+            return finish(S, V, st, "no_callback", phrase(S, "no_callback"))
+        return ask(V, st, "talk_pre", privacy, phrase(S, "third_party_ask", address=who))
     if d is None:
-        d = today
+        d = st.get("cb_day") and D.fromisoformat(st["cb_day"]) or today
+    st["cb_day"] = d.isoformat()
     if not tm:
-        return say_llm(V, st, "talk_pre", "Do not say why you are calling. Ask at what time on " + fmt_date(d) + " " + address(S, V) + " can be reached.")
-    ok = callback_ok(S, d, tm, now)
-    if ok:
+        return ask(V, st, "talk_pre", privacy, phrase(S, "ask_callback_time", date=fmt_date(d, today), address=who))
+    if callback_ok(S, d, tm, now):
         st["cb"] = [d.isoformat(), tm]
-        call_tool(S, V, st, "schedule_callback", {"date": d.isoformat(), "time": tm})
-        return
+        return call_tool(S, V, st, "schedule_callback", {"date": d.isoformat(), "time": tm})
     st["cb_asks"] = int(st.get("cb_asks") or 0) + 1
     if st["cb_asks"] >= int(tp.get("max_asks") or 2):
         return finish(S, V, st, "no_callback", phrase(S, "no_callback"))
     days = allowed_callback_days(S, now)
-    window = (tp.get("window_start") or "") + " and " + (tp.get("window_end") or "")
-    say_llm(V, st, "talk_pre", "That time is not possible. Do not say why you are calling. Ask once for another time: we can call back on " + " or ".join(fmt_date(x) for x in days) + ", between " + window + ".")
+    ask(V, st, "talk_pre", privacy, phrase(S, "callback_other_time", days=" or ".join(fmt_date(x, today) for x in days),
+                                           start=tp.get("window_start") or "", end=tp.get("window_end") or "", address=who))
 
 
 def allowed_callback_days(S, now):
@@ -835,16 +847,15 @@ def allowed_callback_days(S, now):
                 out.append(x)
             x += datetime.timedelta(days=1)
         return out or [next_bday(S, today, include=False)]
-    return [today, next_bday(S, today, include=False)]
+    first = [today] if is_bday(S, today) else []
+    return first + [next_bday(S, today, include=False)]
 
 
 def callback_ok(S, d, tm, now):
     tp = S.get("third_party") or {}
     if d not in allowed_callback_days(S, now):
         return False
-    start = tp.get("window_start") or "00:00"
-    end = tp.get("window_end") or "23:59"
-    if not (start <= tm <= end):
+    if not ((tp.get("window_start") or "00:00") <= tm <= (tp.get("window_end") or "23:59")):
         return False
     if tp.get("after_now", True) and d == now.date() and tm <= now.strftime("%H:%M"):
         return False
@@ -854,47 +865,41 @@ def callback_ok(S, d, tm, now):
 # ---------------------------------------------------------------- phase: identity
 
 def questions(S):
-    qs = ((S.get("identity") or {}).get("questions")) or []
-    return [q for q in qs if isinstance(q, dict) and q.get("field")]
+    return [q for q in (((S.get("identity") or {}).get("questions")) or []) if isinstance(q, dict) and q.get("field")]
 
 
-def ask_question(S, V, st, prefix="", fixed=True):
+def ask_question(S, V, st, *prefix):
     qs = questions(S)
     i = int(st.get("q_index") or 0)
     if i >= len(qs):
         return start_account(S, V, st)
     st["id_partial"] = ""
-    text = (prefix + " " + (qs[i].get("ask_text") or "")).strip()
-    if fixed:
-        say_fixed(V, st, "talk_id", text)
-    else:
-        say_llm(V, st, "talk_id", 'Say: "' + text + '"')
+    ask(V, st, "talk_id", *(list(prefix) + [qs[i].get("ask_text") or ""]))
 
 
 def normalize_answer(q, raw, iso_hint):
     typ = q.get("answer_type") or "text"
+    iso_ok = bool(iso_hint and re.match(r"^\d{4}-\d{2}-\d{2}$", iso_hint))
     if typ == "date":
         status, val = parse_dob(raw, q.get("numeric_date_order") or "DMY")
         if status == "ok":
             return status, val
-        if iso_hint and re.match(r"^\d{4}-\d{2}-\d{2}$", iso_hint) and status != "partial":
+        if iso_ok and (not raw or status == "bad" or parse_year_words(raw)):
             return "ok", iso_hint
-        if iso_hint and re.match(r"^\d{4}-\d{2}-\d{2}$", iso_hint) and status == "partial" and parse_year_words(raw):
-            return "ok", iso_hint
-        return status, None
+        return status if raw else "empty", None
     if typ == "digits":
         n = int(q.get("digits_length") or 0)
         dg = words_to_digits(raw)
         if not dg:
-            return "partial", None
+            return ("partial" if raw else "empty"), None
         if n and len(dg) < n:
             return "partial", None
         return "ok", dg[-n:] if n else dg
     if typ == "year":
         y = parse_year_words(raw)
-        return ("ok", str(y)) if y else ("partial", None)
+        return ("ok", str(y)) if y else (("partial" if raw else "empty"), None)
     v = raw.strip()
-    return ("ok", v) if v else ("partial", None)
+    return ("ok", v) if v else ("empty", None)
 
 
 def on_identity_turn(S, V, st):
@@ -904,76 +909,69 @@ def on_identity_turn(S, V, st):
     q = sval(V, "q_kind")
     consume(V, ("id_answer", "id_iso", "id_reply", "q_kind"))
     idn = S.get("identity") or {}
-    if rk == "human":
-        if handle_human_request(S, V, st, "talk_id"):
-            return
+    if rk == "human" and handle_human(S, V, st, "talk_id"):
+        return
     if rk == "not_talking":
-        if not_talking(S, V, st, "talk_id", False) == "close_declined":
+        if count_not_talking(S, st):
             return finish(S, V, st, "id_declined")
         rk = "refuse"
-    if rk == "asks_purpose" and idn.get("purpose_question_is_refusal", True):
-        rk = "refuse"
-    if rk == "refuse":
+    if rk == "asks_purpose" and not raw:
+        rk = "refuse" if idn.get("purpose_question_is_refusal", True) else "question"
+    if rk == "refuse" and not raw:
         st["refusals"] = int(st.get("refusals") or 0) + 1
         if st["refusals"] >= int(idn.get("max_refusals") or 2):
             return finish(S, V, st, "id_declined")
-        return ask_question(S, V, st, phrase(S, "decline_explain"), fixed=True)
-    if rk == "question" and not raw:
-        ans = answer_for_question(S, q) or phrase(S, "no_info")
-        return ask_question(S, V, st, ans, fixed=True)
+        return ask_question(S, V, st, phrase(S, "decline_explain"))
     qs = questions(S)
     i = int(st.get("q_index") or 0)
     if i >= len(qs):
         return start_account(S, V, st)
-    qd = qs[i]
-    joined = ((st.get("id_partial") or "") + " " + raw).strip()
-    status, val = normalize_answer(qd, joined, iso)
+    if rk == "question" and not raw and not iso:
+        return ask_question(S, V, st, answer_for_question(S, q) or phrase(S, "no_info"))
+    joined = join(st.get("id_partial") or "", raw)
+    status, val = normalize_answer(qs[i], joined, iso)
     if status == "ok":
         st["id_partial"] = ""
         st["id_last"] = val
-        call_tool(S, V, st, "verify_identity", {"field": qd["field"], "answer": val})
-        return
-    if status == "partial" and raw:
+        return call_tool(S, V, st, "verify_identity", {"field": qs[i]["field"], "answer": val})
+    if status == "partial":
         st["id_partial"] = joined
-        return say_llm(V, st, "talk_id", "The customer gave only part of the answer. Ask them, in one short sentence, for the rest of it. Do not repeat the part they already gave.")
+        return say(V, st, "talk_id", phrase(S, "ask_rest"))
     st["id_partial"] = ""
-    return ask_question(S, V, st, "", fixed=False)
+    return ask_question(S, V, st, phrase(S, "not_understood"))
 
 
 def on_verify_result(S, V, st):
     d = tool_result(V, "verify_identity")
     idn = S.get("identity") or {}
     qs = questions(S)
-    i = int(st.get("q_index") or 0)
+    i = min(int(st.get("q_index") or 0), max(0, len(qs) - 1))
     if d is None:
         st["verify_errors"] = int(st.get("verify_errors") or 0) + 1
         if st["verify_errors"] <= 2 and st.get("id_last"):
-            call_tool(S, V, st, "verify_identity", {"field": qs[i]["field"], "answer": st["id_last"]})
-            return
-        return ask_question(S, V, st, "", fixed=False)
+            return call_tool(S, V, st, "verify_identity", {"field": qs[i]["field"], "answer": st["id_last"]})
+        return ask_question(S, V, st, phrase(S, "not_understood"))
     hint = str(d.get(resp_field(S, "verify_identity", "hint")) or "")
     verified = str(d.get(resp_field(S, "verify_identity", "verified"))).lower() == "true"
     allv = str(d.get(resp_field(S, "verify_identity", "all_verified"))).lower() == "true"
-    left = d.get(resp_field(S, "verify_identity", "wrong_answers_left"))
+    left = to_float(d.get(resp_field(S, "verify_identity", "wrong_answers_left")))
     if not tool_ok(S, "verify_identity", d) and not verified:
         # the service could not read the answer: not a wrong answer
-        return say_llm(V, st, "talk_id", 'The answer could not be read. Ask again, in one sentence: "' + (qs[i].get("ask_text") or "") + '"')
+        return ask_question(S, V, st, phrase(S, "unreadable_answer"))
     if allv or (verified and i + 1 >= len(qs)):
         st["verified"] = True
         return start_account(S, V, st)
     if verified:
         st["q_index"] = i + 1
-        return ask_question(S, V, st, "", fixed=True)
-    if hint:
-        for h in idn.get("hints") or []:
-            if h.get("value") == hint:
-                if not h.get("counts_as_wrong", False):
-                    return say_llm(V, st, "talk_id", h.get("instruction") or "Ask the customer to say it again.")
+        return ask_question(S, V, st)
+    for h in idn.get("hints") or []:
+        if hint and h.get("value") == hint and not h.get("counts_as_wrong", False):
+            st["last_ask"] = h.get("instruction") or ""
+            return say(V, st, "talk_id", h.get("instruction") or phrase(S, "not_understood"))
     st["wrong"] = int(st.get("wrong") or 0) + 1
-    left_n = to_float(left)
-    if (left_n is not None and left_n <= 0) or st["wrong"] >= int(idn.get("max_wrong_total") or 3):
+    if (left is not None and left <= 0) or st["wrong"] >= int(idn.get("max_wrong_total") or 3):
         return finish(S, V, st, "id_failed", phrase(S, "id_failed"))
-    return say_llm(V, st, "talk_id", 'That answer does not match. Do not say what the right answer is. Ask the same question again: "' + (qs[i].get("ask_text") or "") + '"')
+    return ask_question(S, V, st, phrase(S, "wrong_answer"))
 
 
 # ---------------------------------------------------------------- phase: the account
@@ -990,7 +988,7 @@ def on_account_result(S, V, st, now):
         st["account_errors"] = int(st.get("account_errors") or 0) + 1
         if st["account_errors"] <= 2:
             return start_account(S, V, st)
-        return finish(S, V, st, "service_error", phrase(S, "service_error"))
+        return finish(S, V, st, "service_error", phrase(S, "service_error", product=""))
     st["products"] = plan_products(S, raw, now.date())
     st["phase"] = "main"
     st["stage"] = "ask_today"
@@ -999,8 +997,9 @@ def on_account_result(S, V, st, now):
     for p in st["products"]:
         lines.append(phrase(S, "debt_line", product=p["spoken"], amount=fmt_amount(p["due"]), days=p["late"]))
     multi = len(st["products"]) > 1
-    lines.append(phrase(S, "pay_all_today" if multi else "pay_today"))
-    say_fixed(V, st, "talk_main", " ".join(x for x in lines if x))
+    question = phrase(S, "pay_all_today" if multi else "pay_today")
+    say(V, st, "talk_main", *(lines + [question]))
+    st["last_ask"] = question  # a repeat asks the question again, not the whole statement
 
 
 # ---------------------------------------------------------------- phase: getting the promise
@@ -1014,58 +1013,59 @@ def current(st):
     i = int(st.get("cur") or 0)
     while i < len(ps) and ps[i].get("status") != "open":
         i += 1
+    if i >= len(ps):
+        i = 0
+        while i < len(ps) and ps[i].get("status") != "open":
+            i += 1
     st["cur"] = i
     return ps[i] if i < len(ps) else None
 
 
-def offer_text(S, st, p, amount, date, today, extra=""):
-    multi = len(st.get("products") or []) > 1
-    what = (" for your " + p["spoken"]) if multi else ""
-    a = fmt_amount(amount)
-    when = "today" if date == today.isoformat() else "on " + fmt_date(D.fromisoformat(date), today)
-    return (extra + " Can you pay " + a + what + " " + when + "?").strip()
+def attempt_spec(S, p, n):
+    for a in sorted([a for a in ((S.get("persuasion") or {}).get("attempts") or []) if isinstance(a, dict)], key=lambda a: int(a.get("n") or 0)):
+        if int(a.get("n") or 0) == n and (not a.get("bands") or p.get("band") in a.get("bands")):
+            return a
+    return None
 
 
-def make_offer(S, V, st, p, amount, date, today, extra="", kind="offer"):
-    p["offer"] = [round(float(amount), 2), date, kind]
-    st["stage"] = "offer"
-    say_llm(V, st, "talk_main", 'Say, in your own words but with exactly these figures: "' + offer_text(S, st, p, amount, date, today, extra) + '" Do not offer anything else.')
-
-
-def attempt_offer(S, V, st, p, today):
-    """A flat refusal: use the next persuasion attempt, or stop."""
-    attempts = [a for a in ((S.get("persuasion") or {}).get("attempts") or []) if isinstance(a, dict)]
-    attempts.sort(key=lambda a: int(a.get("n") or 0))
+def attempt_date(S, p, spec, today):
     dl = D.fromisoformat(p["deadline"])
+    kind = (spec or {}).get("date") or "deadline"
+    d = resolve_named_date(S, kind, today, dl)
+    if d is None or (d == today and kind in ("end_of_this_week", "end_of_next_week")):
+        d = resolve_named_date(S, (spec or {}).get("if_today_is_that_date") or "end_of_next_week", today, dl)
+    if d is None or d > dl:
+        d = dl
+    return max(d, today)
+
+
+def make_offer(S, V, st, p, amount, date_iso, today, *lead):
+    p["offer"] = [round(float(amount), 2), date_iso]
+    st["stage"] = "offer"
+    multi = len(st.get("products") or []) > 1
+    ask(V, st, "talk_main", *(list(lead) + [phrase(S, "offer", amount=fmt_amount(amount), when=when_words(S, date_iso, today),
+                                                  product=(p["spoken"] if multi else ""), for_product=(phrase(S, "for_product", product=p["spoken"]) if multi else ""))]))
+
+
+def attempt_offer(S, V, st, p, today, *lead):
+    """A flat refusal: use the next persuasion attempt, or stop."""
     while int(p.get("used") or 0) < int(p.get("attempts") or 1):
-        n = int(p.get("used") or 0) + 1
-        p["used"] = n
-        spec = None
-        for a in attempts:
-            if int(a.get("n") or 0) == n and (not a.get("bands") or p.get("band") in a.get("bands")):
-                spec = a
-                break
+        p["used"] = int(p.get("used") or 0) + 1
+        spec = attempt_spec(S, p, p["used"])
         if spec is None:
             continue
         kind = spec.get("amount") or "full"
         amount = p["floor"] if kind == "floor" or (kind == "full_or_floor_if_too_much" and p.get("too_much")) else p["due"]
-        d = resolve_named_date(S, spec.get("date") or "deadline", today, dl)
-        if d is None or (d == today and spec.get("date") == "end_of_this_week"):
-            d = resolve_named_date(S, spec.get("if_today_is_that_date") or "end_of_next_week", today, dl)
-        if d is None or d > dl:
-            d = dl
-        if d < today:
-            d = today
-        key = [round(float(amount), 2), d.isoformat()]
-        if key in [r[:2] for r in p.get("refused") or []]:
+        d = attempt_date(S, p, spec, today)
+        if [round(float(amount), 2), d.isoformat()] in (p.get("refused") or []):
             continue
-        return make_offer(S, V, st, p, amount, d.isoformat(), today, kind="attempt")
+        return make_offer(S, V, st, p, amount, d.isoformat(), today, *lead)
     p["status"] = "refused"
-    return next_product(S, V, st, today)
+    return next_product(S, V, st, today, *lead)
 
 
 def check_date(S, p, d, today):
-    """Returns (ok_date_or_None, problem) for a day the customer named."""
+    """(date to use or None, problem) for a day the customer named."""
     dl = D.fromisoformat(p["deadline"])
     earliest = today if ((S.get("promise_date") or {}).get("earliest") or "today") == "today" else today + datetime.timedelta(days=1)
     if d < earliest:
@@ -1073,79 +1073,61 @@ def check_date(S, p, d, today):
     if d > dl:
         return dl, "after_deadline"
     if not is_bday(S, d):
-        nb = next_bday(S, d)
+        nb = prev_bday(S, d) if (S.get("promise_date") or {}).get("non_business") == "offer_previous_business_day" else next_bday(S, d)
         if nb > dl:
-            return prev_bday(S, dl), "non_business"
+            nb = prev_bday(S, dl)
+        if nb < earliest:
+            nb = next_bday(S, earliest)
         return nb, "non_business"
     return d, ""
 
 
-def check_amount(S, p, a):
-    if a is None:
-        return None, ""
-    if a > p["due"] + 0.005:
-        return p["due"], "over"
-    if a + 0.005 < p["floor"]:
-        return p["floor"], "below"
-    return round(a, 2), ""
-
-
-def agree(S, V, st, p, amount, date, today):
+def agree(S, V, st, p, amount, date_iso, today):
     p["amount"] = round(float(amount), 2)
-    p["date"] = date
+    p["date"] = date_iso
     p["status"] = "agreed"
     p["offer"] = None
     return next_product(S, V, st, today)
 
 
-def next_product(S, V, st, today):
+def next_product(S, V, st, today, *lead):
     p = current(st)
     if p is not None:
-        if p.get("entered"):
-            return attempt_offer(S, V, st, p, today) if p.get("needs_attempt") else ask_for_product(S, V, st, p, today)
-        p["entered"] = True
-        return attempt_offer(S, V, st, p, today)
-    return readback(S, V, st, today)
+        if not p.get("entered"):
+            p["entered"] = True
+            return attempt_offer(S, V, st, p, today, *lead)
+        if p.get("offer"):
+            return make_offer(S, V, st, p, p["offer"][0], p["offer"][1], today, *lead)
+        return attempt_offer(S, V, st, p, today, *lead)
+    return readback(S, V, st, today, *lead)
 
 
-def ask_for_product(S, V, st, p, today):
-    p["needs_attempt"] = False
-    return attempt_offer(S, V, st, p, today)
-
-
-def readback(S, V, st, today):
+def readback(S, V, st, today, *lead):
     agreed = [p for p in st.get("products") or [] if p.get("status") == "agreed"]
     if not agreed:
-        return after_records(S, V, st, today)
-    parts = []
-    multi = len(st.get("products") or []) > 1
+        return after_records(S, V, st, today, *lead)
+    items = []
     for p in agreed:
-        when = "today" if p["date"] == today.isoformat() else "on " + fmt_date(D.fromisoformat(p["date"]), today)
-        s = fmt_amount(p["amount"]) + " for your " + p["spoken"] + " " + when
+        s = phrase(S, "promise_item", amount=fmt_amount(p["amount"]), product=p["spoken"], when=when_words(S, p["date"], today))
         if p.get("clamped"):
-            s += " (" + phrase(S, "clamp_note", product=p["spoken"], date=fmt_date(D.fromisoformat(p["date"]), today)) + ")"
-        parts.append(s)
-    text = "So that is " + ("; ".join(parts[:-1]) + " and " + parts[-1] if len(parts) > 1 else parts[0]) + ". " + phrase(S, "confirm_question")
+            s = join(s, "(" + phrase(S, "clamp_note", product=p["spoken"], date=fmt_date(D.fromisoformat(p["date"]), today)) + ")")
+        items.append(s)
+    listing = items[0] if len(items) == 1 else "; ".join(items[:-1]) + "; " + items[-1]
     st["stage"] = "confirm"
-    say_fixed(V, st, "talk_main", text)
+    ask(V, st, "talk_main", *(list(lead) + [phrase(S, "readback", items=listing), phrase(S, "confirm_question")]))
 
 
 def record_next(S, V, st, today):
     for p in st.get("products") or []:
         if p.get("status") == "confirmed":
-            call_tool(S, V, st, "create_promise", {"product_id": p["id"], "amount": p["amount"], "date": p["date"]})
             st["recording"] = p["id"]
-            return
+            return call_tool(S, V, st, "create_promise", {"product_id": p["id"], "amount": p["amount"], "date": p["date"]})
     return after_records(S, V, st, today)
 
 
 def on_promise_result(S, V, st, today):
     d = tool_result(V, "create_promise")
-    pid = st.get("recording")
-    p = None
-    for x in st.get("products") or []:
-        if x.get("id") == pid:
-            p = x
+    p = next((x for x in st.get("products") or [] if x.get("id") == st.get("recording")), None)
     if p is None:
         return after_records(S, V, st, today)
     if tool_ok(S, "create_promise", d):
@@ -1153,8 +1135,7 @@ def on_promise_result(S, V, st, today):
         return record_next(S, V, st, today)
     p["retries"] = int(p.get("retries") or 0) + 1
     if p["retries"] <= int((S.get("promise") or {}).get("retries") or 1):
-        call_tool(S, V, st, "create_promise", {"product_id": p["id"], "amount": p["amount"], "date": p["date"]})
-        return
+        return call_tool(S, V, st, "create_promise", {"product_id": p["id"], "amount": p["amount"], "date": p["date"]})
     p["status"] = "failed"
     p["note_sit"] = "service_error"
     return record_next(S, V, st, today)
@@ -1172,21 +1153,21 @@ def note_reason(S, sit):
     return ""
 
 
-def after_records(S, V, st, today):
-    # notes for every product without a promise, then the goodbye
+def after_records(S, V, st, today, *lead):
+    if lead:
+        st["lead"] = join(st.get("lead") or "", *lead)
     if notes_enabled(S) and not str(st.get("situation") or "").startswith("transfer_"):
         for p in st.get("products") or []:
-            if p.get("status") in ("recorded",) or p.get("noted"):
+            if p.get("status") == "recorded" or p.get("noted"):
                 continue
-            sit = p.get("note_sit") or ({"refused": "refused", "open": "refused", "agreed": "refused", "confirmed": "refused"}.get(p.get("status")) or p.get("status"))
-            reason = note_reason(S, sit)
+            sit = p.get("note_sit") or ("refused" if p.get("status") in ("refused", "open", "agreed", "confirmed") else p.get("status"))
             p["noted"] = True
+            p["note_sit"] = sit
+            reason = note_reason(S, sit)
             if not reason:
                 warn(st, "no note reason for " + str(sit))
                 continue
-            p["note_sit"] = sit
-            call_tool(S, V, st, "add_note", {"product_id": p["id"], "reason": reason, "text": sit})
-            return
+            return call_tool(S, V, st, "add_note", {"product_id": p["id"], "reason": reason, "text": sit})
     return closing_words(S, V, st, today)
 
 
@@ -1194,151 +1175,121 @@ def closing_words(S, V, st, today):
     prods = st.get("products") or []
     rec = [p for p in prods if p.get("status") == "recorded"]
     failed = [p for p in prods if p.get("status") == "failed"]
-    lines = []
+    lines = [st.pop("lead", "") or ""]
     if rec:
-        parts = []
-        for p in rec:
-            when = "today" if p["date"] == today.isoformat() else "on " + fmt_date(D.fromisoformat(p["date"]), today)
-            parts.append(fmt_amount(p["amount"]) + " for your " + p["spoken"] + " " + when)
-        lines.append("Your payment promise of " + " and ".join(parts) + " is recorded.")
+        items = [phrase(S, "promise_item", amount=fmt_amount(p["amount"]), product=p["spoken"], when=when_words(S, p["date"], today)) for p in rec]
+        lines.append(phrase(S, "recorded", items="; ".join(items)))
         lines.append(phrase(S, "after_promise"))
     if failed:
         lines.append(phrase(S, "service_error", product=", ".join(p["spoken"] for p in failed)))
-    if not rec and not failed:
-        sit = st.get("situation") or ""
-        if sit == "already_paid" or (prods and all((p.get("note_sit") or p.get("status")) == "already_paid" for p in prods)):
-            pass
-    return finish(S, V, st, st.get("situation") or "", " ".join(x for x in lines if x))
+    return finish(S, V, st, st.get("situation") or "", *lines)
 
 
-def apply_date_to_all(S, V, st, d, amount, today, p0):
-    """One date for everything that is still open (multi product): each product on its own deadline."""
-    targets = [p for p in st.get("products") or [] if p.get("status") == "open"]
-    if p0 not in targets:
-        targets = [p0] + targets
-    for p in targets:
-        ok_d, problem = check_date(S, p, d, today)
-        if ok_d is None:
-            return None
-        p["clamped"] = problem == "after_deadline"
-        p["amount"] = round(float(amount if (amount is not None and p is p0) else p["due"]), 2)
-        p["date"] = ok_d.isoformat()
-        p["status"] = "agreed"
-        p["offer"] = None
-    return True
+def mark_open(st, status, sit=None):
+    for x in st.get("products") or []:
+        if x.get("status") == "open":
+            x["status"] = status
+            x["note_sit"] = sit or status
 
 
 def on_main_turn(S, V, st, now):
     today = now.date()
     reply = sval(V, "reply")
     dphrase = sval(V, "date_phrase")
-    amount = to_float(V.get("amount"))
+    amount = to_float(sval(V, "amount"))
     allp = sval(V, "applies_to_all")
     q = sval(V, "q_kind")
     consume(V, ("reply", "date_phrase", "amount", "applies_to_all", "q_kind"))
     stage = st.get("stage") or "ask_today"
     prods = st.get("products") or []
     multi = len(prods) > 1
-    mp = S.get("multi_product") or {}
+    rq = S.get("requests") or {}
     p = current(st)
+    d, dkind = parse_day_phrase(S, dphrase, today) if dphrase else (None, "none")
+    proposes = d is not None or amount is not None
 
     # requests that end or redirect the call come first
-    if reply == "restructuring" and ((S.get("requests") or {}).get("restructuring") or {}).get("enabled", True):
+    if reply == "restructuring" and (rq.get("restructuring") or {}).get("enabled", True) and queue_for(S, "restructuring"):
         for x in prods:
             if x.get("status") in ("agreed", "confirmed"):
                 x["status"] = "open"
         st["situation"] = "transfer_restructuring"
         st["transfer_queue"] = queue_for(S, "restructuring")
         return call_tool(S, V, st, "transfer_to_agent", {"queue": st["transfer_queue"]})
-    if reply == "human":
-        if handle_human_request(S, V, st, "talk_main"):
-            return
+    if reply == "human" and handle_human(S, V, st, "talk_main"):
+        return
     if stage == "hardship_offer":
-        if reply in ("yes", "accept"):
+        if reply in ("yes",) and not proposes:
             st["situation"] = "transfer_support"
             st["transfer_queue"] = queue_for(S, "hardship")
             return call_tool(S, V, st, "transfer_to_agent", {"queue": st["transfer_queue"]})
-        if reply in ("no", "refuse", "not_talking") and not dphrase and amount is None:
-            for x in prods:
-                if x.get("status") == "open":
-                    x["status"] = "hardship"
-                    x["note_sit"] = "hardship"
+        if not proposes:
+            # anything but a clear yes declines the transfer; no persuasion follows
+            mark_open(st, "hardship")
             if not multi:
                 st["situation"] = "hardship"
             return readback(S, V, st, today)
-    if reply == "hardship" and (S.get("hardship") or {}).get("enabled", True) and not st.get("hardship_done"):
-        st["hardship_done"] = True
+        st["stage"] = "offer"
+        stage = "offer"
+    if reply == "hardship" and not proposes and (S.get("hardship") or {}).get("enabled", True):
         hs = S.get("hardship") or {}
-        if hs.get("offer_transfer", True) and queue_for(S, "hardship"):
+        if hs.get("offer_transfer", True) and queue_for(S, "hardship") and not st.get("hardship_offered"):
+            st["hardship_offered"] = True
             st["stage"] = "hardship_offer"
-            return say_llm(V, st, "talk_main", 'Say exactly one short sentence of sympathy: "' + phrase(S, "hardship_sympathy") + '" Then offer: "' + phrase(S, "hardship_offer_transfer") + '" Do not ask for any payment.')
-        for x in prods:
-            if x.get("status") == "open":
-                x["status"] = "hardship"
-                x["note_sit"] = "hardship"
+            return ask(V, st, "talk_main", phrase(S, "hardship_sympathy"), phrase(S, "hardship_offer_transfer"))
+        mark_open(st, "hardship")
         if not multi:
             st["situation"] = "hardship"
-        return readback(S, V, st, today)
-    if reply == "already_paid" and ((S.get("requests") or {}).get("already_paid") or {}).get("enabled", True):
-        target = p if (multi and p is not None and stage != "ask_today") else None
-        if multi and target is not None:
-            target["status"] = "already_paid"
-            target["note_sit"] = "already_paid"
-            say_line = phrase(S, "already_paid")
-            nxt = current(st)
-            if nxt is None:
-                return readback(S, V, st, today) if any(x.get("status") == "agreed" for x in prods) else after_records_with(S, V, st, today, say_line)
-            return attempt_with_lead(S, V, st, nxt, today, say_line)
-        for x in prods:
-            if x.get("status") == "open":
-                x["status"] = "already_paid"
-                x["note_sit"] = "already_paid"
+        return readback(S, V, st, today, "" if st.get("hardship_offered") else phrase(S, "hardship_sympathy"))
+    if reply == "already_paid" and (rq.get("already_paid") or {}).get("enabled", True):
+        lead = phrase(S, "already_paid")
+        if multi and p is not None and stage != "ask_today":
+            p["status"] = "already_paid"
+            p["note_sit"] = "already_paid"
+            return next_product(S, V, st, today, lead)
+        mark_open(st, "already_paid")
         if not multi:
             st["situation"] = "already_paid"
-        return after_records_with(S, V, st, today, phrase(S, "already_paid"))
-    if reply == "dispute" and ((S.get("requests") or {}).get("dispute") or {}).get("enabled", True):
+        return readback(S, V, st, today, lead)
+    if reply == "dispute" and (rq.get("dispute") or {}).get("enabled", True):
+        lead = phrase(S, "dispute_ack")
         if multi and p is not None and stage != "ask_today":
             p["status"] = "dispute"
             p["note_sit"] = "dispute"
-            nxt = current(st)
-            lead = phrase(S, "dispute_ack")
-            if nxt is None:
-                return readback(S, V, st, today) if any(x.get("status") == "agreed" for x in prods) else after_records_with(S, V, st, today, lead)
-            return attempt_with_lead(S, V, st, nxt, today, lead)
-        for x in prods:
-            if x.get("status") == "open":
-                x["status"] = "dispute"
-                x["note_sit"] = "dispute"
+            return next_product(S, V, st, today, lead)
+        mark_open(st, "dispute")
         if not multi:
             st["situation"] = "dispute"
-        return after_records_with(S, V, st, today, phrase(S, "dispute_ack"))
-    if reply == "not_talking":
-        if not_talking(S, V, st, "talk_main", True) == "close_refused":
-            if not multi:
-                st["situation"] = "refused"
+        return readback(S, V, st, today, lead)
+    if reply == "not_talking" and not proposes:
+        if count_not_talking(S, st):
+            mark_open(st, "refused")
+            for x in prods:
+                if x.get("status") == "agreed":
+                    x["status"] = "refused"
+                    x["note_sit"] = "refused"
             return readback(S, V, st, today)
-        return say_llm(V, st, "talk_main", "The customer does not want to talk. Acknowledge it in one sentence and repeat the last question once.")
+        return repeat_last(V, st, "talk_main", phrase(S, "not_talking_ack"))
     if reply == "change_recorded":
-        return say_llm(V, st, "talk_main", 'Say: "' + phrase(S, "changes_after_record") + '" Then continue with the last question.')
+        return repeat_last(V, st, "talk_main", phrase(S, "changes_after_record"))
 
     # the read-back
     if stage == "confirm":
-        if reply in ("yes", "accept") and not dphrase and amount is None:
+        if reply == "yes" and not proposes:
             for x in prods:
                 if x.get("status") == "agreed":
                     x["status"] = "confirmed"
             return record_next(S, V, st, today)
-        if dphrase or amount is not None:
+        if proposes:
             agreed = [x for x in prods if x.get("status") == "agreed"]
-            target = agreed[-1] if agreed else None
-            if target is not None:
+            if agreed:
+                target = agreed[-1] if not multi else (agreed[-1] if allp != "yes" else agreed[0])
                 target["status"] = "open"
-                p = target
+                target["offer"] = [target["amount"], target["date"]]
                 st["cur"] = prods.index(target)
-                stage = "offer"
-                target["offer"] = [target["amount"], target["date"], "readback"]
-        else:
-            # not a clear yes: treat it as a refusal of what was read back
+                p = target
+                stage = st["stage"] = "offer"
+        elif reply == "no":
             agreed = [x for x in prods if x.get("status") == "agreed"]
             for x in agreed:
                 x["status"] = "open"
@@ -1346,103 +1297,97 @@ def on_main_turn(S, V, st, now):
             p = current(st)
             if p is None:
                 return readback(S, V, st, today)
+            st["stage"] = "offer"
             return attempt_offer(S, V, st, p, today)
+        else:
+            return repeat_last(V, st, "talk_main", answer_for_question(S, q))
 
     if p is None:
         return readback(S, V, st, today)
 
     # a date or an amount from the customer is never a refusal
-    d, dkind = parse_day_phrase(S, dphrase, today) if dphrase else (None, "none")
-    if dkind == "vague" or reply == "vague":
-        if d is None:
-            p["vague"] = int(p.get("vague") or 0) + 1
-            if p["vague"] <= int((S.get("promise_date") or {}).get("vague_ask_times") or 1):
-                return say_llm(V, st, "talk_main", "The customer named no exact day. Ask once for the exact day they can pay" + ((" for the " + p["spoken"]) if multi else "") + ". Do not suggest a day yourself.")
-            dl = D.fromisoformat(p["deadline"])
-            amt = p["offer"][0] if p.get("offer") else (p["floor"] if p.get("too_much") else p["due"])
-            return make_offer(S, V, st, p, amt, dl.isoformat(), today, kind="deadline")
-    if reply == "too_much" and amount is None and d is None:
+    if d is None and (dkind == "vague" or reply == "vague") and amount is None:
+        p["vague"] = int(p.get("vague") or 0) + 1
+        if p["vague"] <= int((S.get("promise_date") or {}).get("vague_ask_times") or 1):
+            return ask(V, st, "talk_main", phrase(S, "ask_exact_day", product=p["spoken"]))
+        amt = p["offer"][0] if p.get("offer") else (p["floor"] if p.get("too_much") else p["due"])
+        return make_offer(S, V, st, p, amt, p["deadline"], today)
+    if reply == "too_much" and not proposes:
         p["too_much"] = True
         if int(p.get("floor_offered") or 0) < int((S.get("amounts") or {}).get("floor_offer_times") or 1) and p["floor"] < p["due"]:
             p["floor_offered"] = int(p.get("floor_offered") or 0) + 1
-            date = (p.get("offer") or [None, today.isoformat()])[1]
-            return make_offer(S, V, st, p, p["floor"], date, today, extra=phrase(S, "floor_caveat", amount=fmt_amount(p["floor"])), kind="floor")
-        reply = "refuse"
-    if d is not None or amount is not None:
+            date_iso = p["offer"][1] if p.get("offer") and p["offer"][1] else attempt_date(S, p, attempt_spec(S, p, 1), today).isoformat()
+            return make_offer(S, V, st, p, p["floor"], date_iso, today, phrase(S, "floor_caveat", amount=fmt_amount(p["floor"])))
+        reply = "no"
+    if proposes:
         base_amt = p["offer"][0] if p.get("offer") else (p["floor"] if p.get("too_much") else p["due"])
-        base_date = p["offer"][1] if p.get("offer") else None
-        if stage == "ask_today" and base_date is None and reply in ("yes", "accept"):
+        base_date = p["offer"][1] if p.get("offer") and p["offer"][1] else None
+        if stage == "ask_today" and base_date is None and reply == "yes" and d is None:
             base_date = today.isoformat()
-        a, aprob = check_amount(S, p, amount) if amount is not None else (base_amt, "")
-        if aprob == "below":
-            if int(p.get("below_offered") or 0) < int((S.get("amounts") or {}).get("below_floor_offer_times") or 1):
-                p["below_offered"] = int(p.get("below_offered") or 0) + 1
-                date = d.isoformat() if d is not None else (base_date or today.isoformat())
-                if d is not None:
-                    ok_d, _ = check_date(S, p, d, today)
-                    date = (ok_d or today).isoformat()
-                return make_offer(S, V, st, p, p["floor"], date, today, extra="That amount cannot be recorded. The lowest amount I can record is " + fmt_amount(p["floor"]) + ".", kind="floor")
-            return refusal(S, V, st, p, today)
+        a = base_amt
+        if amount is not None:
+            if amount > p["due"] + 0.005:
+                a = p["due"]
+            elif amount + 0.005 < p["floor"]:
+                if int(p.get("below_offered") or 0) < int((S.get("amounts") or {}).get("below_floor_offer_times") or 1):
+                    p["below_offered"] = int(p.get("below_offered") or 0) + 1
+                    if d is not None:
+                        ok_d, _ = check_date(S, p, d, today)
+                        date_iso = (ok_d or today).isoformat()
+                    else:
+                        date_iso = base_date or attempt_date(S, p, attempt_spec(S, p, 1), today).isoformat()
+                    return make_offer(S, V, st, p, p["floor"], date_iso, today, phrase(S, "below_floor", amount=fmt_amount(p["floor"])))
+                return refusal(S, V, st, p, today)
+            else:
+                a = round(amount, 2)
         if d is None:
             if base_date is None:
-                p["offer"] = [a, None, "amount"]
-                return say_llm(V, st, "talk_main", "Ask on which day the customer can pay " + fmt_amount(a) + ((" for the " + p["spoken"]) if multi else "") + ". Do not suggest a day yourself.")
+                p["offer"] = [a, None]
+                return ask(V, st, "talk_main", phrase(S, "ask_day_for_amount", amount=fmt_amount(a), product=p["spoken"]))
             d = D.fromisoformat(base_date)
         ok_d, problem = check_date(S, p, d, today)
         if ok_d is None:
-            return say_llm(V, st, "talk_main", "That day is in the past. Ask for a day from today on.")
-        if multi and (allp == "yes" or stage == "ask_today") and mp.get("clamp_to_deadline", True) and len(open_products(st)) > 1:
-            if apply_date_to_all(S, V, st, d, amount if amount is not None else None, today, p):
-                return readback(S, V, st, today)
+            return ask(V, st, "talk_main", phrase(S, "past_date"))
+        everyone = multi and len(open_products(st)) > 1 and (allp == "yes" or (stage == "ask_today" and allp != "no"))
+        if everyone and problem in ("", "after_deadline") and (S.get("multi_product") or {}).get("clamp_to_deadline", True):
+            for x in open_products(st):
+                x_d, x_prob = check_date(S, x, d, today)
+                x["clamped"] = x_prob == "after_deadline"
+                x["amount"] = a if x is p else (x["offer"][0] if x.get("offer") else (x["floor"] if x.get("too_much") else x["due"]))
+                x["date"] = (x_d or d).isoformat()
+                x["status"] = "agreed"
+                x["offer"] = None
+            return readback(S, V, st, today)
         if problem == "after_deadline":
-            return make_offer(S, V, st, p, a, ok_d.isoformat(), today, extra="The latest date I can record is " + fmt_date(ok_d, today) + ".", kind="deadline")
+            return make_offer(S, V, st, p, a, ok_d.isoformat(), today, phrase(S, "latest_date", date=fmt_date(ok_d, today)))
         if problem == "non_business":
-            return make_offer(S, V, st, p, a, ok_d.isoformat(), today, extra=fmt_date(d, today) + " is not a business day. The next business day is " + fmt_date(ok_d, today) + ".", kind="next_bday")
+            return make_offer(S, V, st, p, a, ok_d.isoformat(), today, phrase(S, "not_business_day", date=fmt_date(d, today), next=fmt_date(ok_d, today)))
         return agree(S, V, st, p, a, ok_d.isoformat(), today)
-    if reply in ("yes", "accept"):
+    if reply == "yes":
         if stage == "ask_today":
-            if multi:
-                for x in open_products(st):
-                    x["amount"], x["date"], x["status"] = x["due"], today.isoformat(), "agreed"
-                return readback(S, V, st, today)
-            return agree(S, V, st, p, p["due"], today.isoformat(), today)
+            for x in open_products(st):
+                x["amount"], x["date"], x["status"], x["offer"] = x["due"], today.isoformat(), "agreed", None
+            return readback(S, V, st, today)
         if p.get("offer") and p["offer"][1]:
             return agree(S, V, st, p, p["offer"][0], p["offer"][1], today)
-        return agree(S, V, st, p, p["due"], today.isoformat(), today)
-    if reply in ("no", "refuse"):
+        return repeat_last(V, st, "talk_main")
+    if reply == "no":
         return refusal(S, V, st, p, today)
-    if reply == "question" or q:
-        ans = answer_for_question(S, q) or phrase(S, "no_info")
-        return say_llm(V, st, "talk_main", 'Answer the customer in one sentence: "' + ans + '" Then repeat the last question, with the same figures.')
-    return say_llm(V, st, "talk_main", "Reply briefly to what the customer said, without new figures or offers, then repeat the last question with the same figures.")
+    if q or reply == "question":
+        return repeat_last(V, st, "talk_main", answer_for_question(S, q) or phrase(S, "no_info"))
+    return repeat_last(V, st, "talk_main", phrase(S, "not_understood"))
 
 
 def refusal(S, V, st, p, today):
-    if p.get("offer"):
-        p["refused"] = (p.get("refused") or []) + [p["offer"][:2]]
+    if p.get("offer") and p["offer"][1]:
+        p["refused"] = (p.get("refused") or []) + [[p["offer"][0], p["offer"][1]]]
     if st.get("stage") == "ask_today":
-        multi = len(st.get("products") or []) > 1
         st["stage"] = "offer"
-        if multi:
-            for x in open_products(st):
-                x["entered"] = False
-            p = current(st)
-            p["entered"] = True
-        return attempt_offer(S, V, st, p, today)
+        for x in open_products(st):
+            x["refused"] = (x.get("refused") or []) + [[x["due"], today.isoformat()]]
+        p = current(st)
+        p["entered"] = True
     return attempt_offer(S, V, st, p, today)
-
-
-def attempt_with_lead(S, V, st, p, today, lead):
-    p["entered"] = True
-    attempt_offer(S, V, st, p, today)
-    if V.get("next_step") == "talk_main_llm":
-        V["instruction"] = 'First say: "' + lead + '" ' + V["instruction"]
-    return
-
-
-def after_records_with(S, V, st, today, lead):
-    st["lead"] = lead
-    return after_records(S, V, st, today)
 
 
 # ---------------------------------------------------------------- entry point
@@ -1468,33 +1413,34 @@ def run(V, S):
         st = {"phase": "presence", "asks": 1, "pending": ""}
         set_final(S, V, st)
         V["farewell"] = phrase(S, "goodbye") or "Goodbye."
-        ask_identity_question(S, V, st, phrase(S, "opening"))
+        say(V, st, "talk_pre", phrase(S, "opening"), identity_question(S, V))
         save(V, st)
         return
     pend = st.get("pending") or ""
     phase = st.get("phase")
+    today = now.date()
     if pend == "tool:verify_identity":
         on_verify_result(S, V, st)
     elif pend == "tool:get_account":
         on_account_result(S, V, st, now)
     elif pend == "tool:create_promise":
-        on_promise_result(S, V, st, now.date())
+        on_promise_result(S, V, st, today)
     elif pend == "tool:add_note":
-        after_records(S, V, st, now.date())
+        after_records(S, V, st, today)
     elif pend == "tool:schedule_callback":
         d = tool_result(V, "schedule_callback")
         if tool_ok(S, "schedule_callback", d):
-            finish(S, V, st, "callback", phrase(S, "callback_confirm", date=fmt_date(D.fromisoformat(st["cb"][0]), now.date()), time=st["cb"][1]))
+            finish(S, V, st, "callback", phrase(S, "callback_confirm", date=fmt_date(D.fromisoformat(st["cb"][0]), today), time=st["cb"][1]))
         else:
             st["cb_fail"] = int(st.get("cb_fail") or 0) + 1
             if st["cb_fail"] <= 1:
                 call_tool(S, V, st, "schedule_callback", {"date": st["cb"][0], "time": st["cb"][1]})
             else:
-                finish(S, V, st, "no_callback", phrase(S, "service_error", product="callback"))
+                finish(S, V, st, "no_callback", phrase(S, "no_callback"))
     elif pend == "tool:transfer_to_agent":
         finish(S, V, st, st.get("situation") or "", phrase(S, "transfer_announce"))
     elif phase == "presence":
-        on_presence(S, V, st)
+        on_presence(S, V, st, now)
     elif phase == "third_party":
         on_third_party(S, V, st, now)
     elif phase == "identity":
@@ -1504,6 +1450,6 @@ def run(V, S):
     else:
         finish(S, V, st, "")
     if st.get("lead") and V.get("next_step") == "bye":
-        V["farewell"] = (st.pop("lead") + " " + V.get("farewell", "")).strip()
+        V["farewell"] = join(st.pop("lead"), V.get("farewell", ""))
     set_final(S, V, st)
     save(V, st)

@@ -42,6 +42,29 @@ SCRIPTS = {
 }
 
 
+# variants of the public cases: the same customer, a different way through the call
+VARIANTS = {
+    "PUB-07b": ("PUB-07", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": ""}, {"id_reply": "answer", "id_answer": "fifth of December nineteen seventy five"},
+                           {"id_reply": "answer", "id_answer": "seven zero nine three"}, {"reply": "no"}, {"reply": "vague", "date_phrase": "the week after next"},
+                           {"reply": "propose", "date_phrase": "Monday the 26th"}, {"reply": "yes"}, {"reply": "yes"}]),
+    "PUB-05b": ("PUB-05", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "Ninth of September nineteen ninety"}, {"id_reply": "answer", "id_answer": "Eight eight four six"},
+                           {"reply": "hardship", "q_kind": "other"}, {"reply": "question", "q_kind": "other"}]),
+    "PUB-06b": ("PUB-06", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "Seventeenth of May nineteen eighty six"}, {"id_reply": "answer", "id_answer": "one five zero two"},
+                           {"reply": "too_much"}, {"reply": "yes", "date_phrase": "this Friday"}, {"reply": "yes"}]),
+    "PUB-06c": ("PUB-06", [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "17/05/1986"}, {"id_reply": "answer", "id_answer": "fifteen oh two"},
+                           {"reply": "too_much"}, {"reply": "no", "q_kind": "other"}, {"reply": "yes"}, {"reply": "yes"}]),
+    "PUB-01b": ("PUB-01", [{"presence": "unclear"}, {"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "the fourteenth of March"},
+                           {"id_reply": "answer", "id_answer": "nineteen eighty-eight"}, {"id_reply": "answer", "id_answer": "four four"}, {"id_reply": "answer", "id_answer": "seven one"},
+                           {"reply": "question", "q_kind": "scam"}, {"reply": "yes"}, {"reply": "yes"}]),
+    "PUB-02b": ("PUB-02", [{"presence": "other_person", "cb_phrase": "she is back tomorrow, call around eleven"}]),
+}
+for k, (base, turns) in VARIANTS.items():
+    CASES[k] = dict(CASES[base], id=k)
+    SCRIPTS[k] = turns
+# PUB-06c: the floor on Friday is refused, attempt 2 of the late band offers the floor on the deadline
+CASES["PUB-06c"] = dict(CASES["PUB-06"], id="PUB-06c", expected=dict(CASES["PUB-06"]["expected"], promises=[{"product_id": "p1", "amount": 637.5, "date": "2026-10-23"}]))
+
+
 class Bank:
     def __init__(self, case):
         self.case, self.wrong, self.ok = case, 0, set()

@@ -5,7 +5,7 @@ the LLM maps whatever a brief calls them onto these words.
 """
 import copy, re
 
-SCHEMA_VERSION = "7"
+SCHEMA_VERSION = "8"
 
 SITUATIONS = ["promise_recorded", "already_paid", "transfer_restructuring", "transfer_human", "transfer_support",
               "refused", "hardship", "dispute", "service_error", "id_failed", "id_declined", "callback",
@@ -68,6 +68,27 @@ PHRASES = {
     "hardship_offer_transfer": "Offers to connect the customer with the team that helps in hardship.",
     "service_error": "Said when a promise could not be recorded after the retries. Use <product>.",
     "goodbye": "Thanks the customer and says goodbye. Said last in every call.",
+    "not_understood": "Said when the agent did not catch the answer, before asking again.",
+    "third_party_privacy": "Said to someone else on the line who asks what the call is about. Gives no reason. Use <address>.",
+    "ask_rest": "Asks for the rest of an answer the customer gave only in part.",
+    "wrong_answer": "Said after a wrong security answer, before asking the same question again. Never reveals the right answer.",
+    "unreadable_answer": "Said when the security answer could not be read, before asking again.",
+    "ask_callback_time": "Asks someone else on the line at what time on <date> <address> can be reached.",
+    "callback_other_time": "Says a callback is possible on <days> between <start> and <end>, and asks for another time.",
+    "not_talking_ack": "Acknowledges that the customer does not want to talk, before asking once more.",
+    "offer": "Proposes a payment. Use <amount>, <for_product> (empty for one product) and <when> (e.g. 'today' or 'on Friday 16 October'). A question.",
+    "for_product": "The words that name the product inside an offer, e.g. 'for your <product>'.",
+    "word_today": "The word for today inside a sentence, e.g. 'today'.",
+    "word_on_date": "The words for a day inside a sentence, e.g. 'on <date>'.",
+    "promise_item": "One promise inside a read-back or confirmation. Use <amount>, <product> and <when>.",
+    "readback": "Reads the promises back. Use <items>. The confirmation question follows separately.",
+    "recorded": "Says the promises are recorded. Use <items>. Said only after the bank confirmed the recording.",
+    "ask_exact_day": "Asks once for the exact day after the customer named only a vague period.",
+    "ask_day_for_amount": "Asks on which day the customer can pay <amount>.",
+    "latest_date": "Says the latest date that can be recorded is <date>.",
+    "not_business_day": "Says <date> is not a business day and the next business day is <next>.",
+    "past_date": "Says the day has passed and asks for a day from today on.",
+    "below_floor": "Says the proposed amount cannot be recorded and the lowest amount that can be recorded is <amount>.",
 }
 
 

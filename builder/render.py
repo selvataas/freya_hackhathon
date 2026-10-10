@@ -169,6 +169,7 @@ def _api_node(tool, spec, targets):
 
 
 def _ex(name, typ, desc, enum=None):
+    # free text gets a low bar: a discarded value leaves no trace and looks like silence
     x = {"name": name, "type": typ, "description": desc, "min_confidence": 0.5, "max_retries": 0}
     if enum:
         x["enum_values"] = enum + ([EMPTY] if EMPTY not in enum else [])

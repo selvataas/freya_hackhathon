@@ -5,7 +5,7 @@ from spec_schema import SCHEMA, SCHEMA_VERSION, SITUATIONS, NOTE_SITUATIONS, TOO
 
 MODEL = os.environ.get("BUILDER_MODEL", "claude-opus-5-5")
 EFFORT = os.environ.get("BUILDER_EFFORT", "high")
-PROMPT_VERSION = "4"
+PROMPT_VERSION = "5"
 CACHE = pathlib.Path(__file__).resolve().parent.parent / "cache"
 
 INSTRUCTIONS = f"""You read a bank's specification ("brief") for an outbound collections phone call, and the bank's tool API (OpenAPI).
@@ -156,6 +156,12 @@ def _canon(spec):
             p["text"] = ""
     for r in s.get("unplaced_rules") or []:
         r["note"] = ""
+    # free wording the runtime says as it is: a different wording is not a different rule
+    for q in (s.get("identity") or {}).get("questions") or []:
+        q["ask_text"] = ""
+    for h in (s.get("identity") or {}).get("hints") or []:
+        h["instruction"] = ""
+    s.pop("forbidden", None)
     for key in ("hardship", "requests"):
         obj = s.get(key) or {}
         for v in [obj] + [x for x in obj.values() if isinstance(x, dict)]:
