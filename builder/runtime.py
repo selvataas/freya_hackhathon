@@ -283,6 +283,10 @@ def parse_day_phrase(S, text, today):
     t = (text or "").lower().strip()
     if not t:
         return None, "none"
+    # "the 21st, sorry, I mean the 20th": the part after the last correction counts
+    parts = re.split(r"\b(?:sorry|i mean|i meant|actually|no wait|rather|correction)\b", t)
+    if len(parts) > 1 and parts[-1].strip(" ,.!?"):
+        t = parts[-1]
     t = re.sub(r"[,.!?]", " ", t)
     c = S.get("calendar") or {}
     m = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", t)
@@ -351,7 +355,10 @@ def parse_day_phrase(S, text, today):
                 d = monday + datetime.timedelta(days=wd)
                 return (d if d > today else d + datetime.timedelta(days=7)), "date"
             return monday + datetime.timedelta(days=7 + wd), "date"
-        if re.search(r"\bthis\s+(coming\s+)?" + WEEKDAYS[wd], t):
+        if re.search(r"\bthis\s+" + WEEKDAYS[wd], t):
+            # the one in the current week, even if it has passed: the date check then says so
+            return monday + datetime.timedelta(days=wd), "date"
+        if re.search(r"\bthis\s+coming\s+" + WEEKDAYS[wd], t):
             d = monday + datetime.timedelta(days=wd)
             return (d if d >= today else d + datetime.timedelta(days=7)), "date"
         d = monday + datetime.timedelta(days=wd)
