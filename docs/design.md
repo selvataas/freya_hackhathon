@@ -8,7 +8,7 @@ Bu belge `builder/` altındaki builder'ın mimarisini anlatır. Kit dokümanlar�
 |---|---|
 | CLI | `python3 builder/build.py <brief>... <openapi>`. Son argüman her zaman openapi. Tek brief + openapi mutlaka çalışır (teslim formatı). Brief yolu bir klasörse içindeki dosyalar ada göre sırayla okunur. Birden çok brief verilirse sırayla birleştirilir (ör. Brief B, Brief A'ya dayanır). |
 | Slot | Her brief için ayrı slot. Slot adı son brief dosyasının adından türer (`brief-a.md` → `brief-a`, klasörse klasör adı). Her build kendi slotunu `freya.save_workflow` ile günceller ve yayınlar; yeni workflow açmaz. |
-| Spec modeli | `claude-opus-5-5`, temperature 0, iki çıkarım paralel. Farklıysa üçüncü bir uzlaştırma çağrısı. |
+| Spec modeli | `claude-opus-5-5` (Anthropic SDK, `.venv` içinde Python 3.12). Bu model `temperature` kabul etmez ve düşünmesi kapatılamaz; tutarlılık sabit `effort`, iki paralel çıkarım + kod karşılaştırması, gerekirse uzlaştırma çağrısı ve brief hash'ine göre spec önbelleği (`cache/`) ile sağlanır. |
 | Ajan modeli | `freya.AGENT_LLM`, değiştirilmez. |
 | Brief'e özel değer | Builder kodunda brief'ten gelen hiçbir değer, kural, cümle veya isim yok. Kodda yalnızca builder'ın kendi sabit sözlükleri var (situation adları, tarih ifadeleri). |
 

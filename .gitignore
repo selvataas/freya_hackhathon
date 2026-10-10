@@ -3,3 +3,5 @@ env.sh
 .env
 results/
 .personas.json
+.venv/
+cache/
