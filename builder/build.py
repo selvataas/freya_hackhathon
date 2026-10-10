@@ -34,6 +34,17 @@ def slot_name(paths):
     return p.name if p.is_dir() else p.stem
 
 
+def rename(workflow_id, name, wf, trace):
+    """Keep the workflow's name equal to its slot. A failure here is logged and never stops the build."""
+    try:
+        cur = freya.api("GET", f"/api/v2/workflow/{workflow_id}", workspaceId=freya.workspace_id())["workflow"]
+        if cur.get("name") != name:
+            freya.api("PUT", f"/api/v2/workflow/{workflow_id}", {"name": name, "workflow": wf})
+            trace.event("renamed", workflow_id=workflow_id, old=cur.get("name"), new=name)
+    except Exception as e:
+        trace.event("warning", message=f"could not rename the workflow: {e}"[:300])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("paths", nargs="+")
@@ -87,8 +98,14 @@ def main():
         if a.dry:
             print(json.dumps({"slot": slot, "dry_run": v, "selftest": f"{ok}/{len(st)}", "warnings": len(warnings)}))
             return
-        ids = freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json"))
-        trace.event("saved", slot=slot, **ids)
+        state_file = ROOT / ".freya-agents.json"
+        known = (json.loads(state_file.read_text()) if state_file.exists() else {}).get(slot)
+        if known:
+            rename(known["workflow_id"], slot, wf, trace)
+        ids = freya.save_workflow(slot, wf, state_file=str(state_file))
+        if not known:
+            rename(ids["workflow_id"], slot, wf, trace)
+        trace.event("saved", slot=slot, name=slot, **ids)
         print(json.dumps({"slot": slot, **ids, "selftest": f"{ok}/{len(st)}", "warnings": len(warnings)}))
         if a.test:
             cmd = [sys.executable, str(ROOT / "tools" / "run_cases.py"), ids["agent_id"], "--brief", a.test, "--out", str(ROOT / "results" / f"{slot}.json")]
