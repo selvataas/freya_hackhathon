@@ -105,10 +105,44 @@ grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/*<slot>*.
 
 ## 4. Export, commit, submit
 
+**Export right after every build**, before anything else touches the workflow. The submitted workflow must be the output
+of the run whose trace we submit:
+
+- If the builder runs again for a brief (a fix, a rebuild), the new run's trace, build log and export replace the old
+  three together. Never mix a trace of one run with the export of another.
+- The check below must pass for the three files that go into `submission/`.
+
 ```bash
+# run the build, then export at once
+LLM_MODEL=claude-opus-5-5 python3 builder/build.py final/<name>/<name>.md final/<name>/openapi.json 2>&1 | tee traces/final-<name>.log
 python3 -c "import freya,json,sys; s=json.load(open('.freya-agents.json'))[sys.argv[1]]; print(freya.export_workflow(s['workflow_id'], 'submission/'+sys.argv[1]+'.workflow.json'))" <slot>
-cp traces/<time>-<slot>.jsonl submission/<slot>.trace.jsonl
-cp traces/final-<slot>.log submission/<slot>.build.log
+cp "$(ls -t traces/*-<slot>.jsonl | head -1)" submission/<slot>.trace.jsonl
+cp traces/final-<name>.log submission/<slot>.build.log
+
+# the export is this run's workflow: every field of the build output is in it, and the ids match the trace
+python3 - <slot> <<'PY'
+import json, sys
+slot = sys.argv[1]
+ex = json.load(open(f"submission/{slot}.workflow.json"))
+built = json.load(open(f"out/{slot}.workflow.json"))
+saved = [json.loads(l) for l in open(f"submission/{slot}.trace.jsonl") if '"event": "saved"' in l][-1]
+def walk(a, b, p=""):
+    if isinstance(a, dict):
+        return sum((walk(v, b.get(k), p + "/" + k) if isinstance(b, dict) and k in b else [p + "/" + k] for k, v in a.items()), [])
+    return [] if a == b else [p]
+diff = walk(built, ex["workflow"])
+print("fields missing or changed:", len(diff), diff[:5])
+print("workflow id matches the trace:", ex["workflow_id"] == saved["workflow_id"], "| agent id:", ex["agent_id"] == saved["agent_id"])
+PY
+```
+
+Both lines must read `0` and `True True`. The platform adds an `agent_config` to the export; that is expected (a round
+trip test on 10 October created a workflow from an export as it is, `agent_config` included, and it passed PUB-01 and
+PUB-10; its leftover `firstMessage` is never spoken).
+
+### Commit and hand in
+
+```bash
 git add final submission
 git commit -m "Final build: <slot>"
 git push
