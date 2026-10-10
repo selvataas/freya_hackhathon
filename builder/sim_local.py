@@ -65,6 +65,8 @@ VARIANTS = {
 for k, (base, turns) in VARIANTS.items():
     CASES[k] = dict(CASES[base], id=k)
     SCRIPTS[k] = turns
+CASES["PUB-01t"] = dict(CASES["PUB-01"], id="PUB-01t", timeout_first=True)
+SCRIPTS["PUB-01t"] = SCRIPTS["PUB-01"]
 # PUB-06c: the floor on Friday is refused, attempt 2 of the late band offers the floor on the deadline
 CASES["PUB-06c"] = dict(CASES["PUB-06"], id="PUB-06c", expected=dict(CASES["PUB-06"]["expected"], promises=[{"product_id": "p1", "amount": 637.5, "date": "2026-10-23"}]))
 
@@ -78,6 +80,11 @@ class Bank:
 
     def call(self, tool, a):
         self.calls.append(tool)
+        if tool == "create_promise" and self.case.get("timeout_first") and not self.calls.count(tool) > 1:
+            self.promises.append((a["product_id"], round(float(a["amount"]), 2), a["date"]))
+            return None
+        if tool == "create_promise" and any(x[0] == a["product_id"] for x in self.promises):
+            return {"ok": False, "error": "this product already has a promise"}
         if self.fail.get(tool):
             self.fail[tool] -= 1
             return {"ok": False, "error": "service unavailable, nothing was recorded"}
@@ -130,7 +137,7 @@ def run_case(spec, cid, verbose=False):
             args = dict((k[len("a_" + tool + "_"):], v) for k, v in V.items() if k.startswith("a_" + tool + "_") and v != "")
             res = bank.call(tool, args)
             log.append(("TOOL", f"{tool} {args} -> {res}"))
-            V["res_" + tool] = json.dumps(res)
+            V["res_" + tool] = json.dumps(res) if res is not None else ""
         else:
             log.append(("AGENT", "[bye] " + V.get("farewell", "")))
             break

@@ -14,7 +14,13 @@ def _code_node(name, code, targets):
                              "parameters": {"type": "object", "properties": {
                                  "code": {"type": "string", "default": code},
                                  "timeout_ms": {"type": "number", "default": 20000}}}}}],
-            "transitions": [_eq("next_step", t, t) for t in targets] + [_always("bye")]}
+            "transitions": [_gt(name + "_failure_count", 2, "bye")] + [_eq("next_step", t, t) for t in targets] + [_always("bye")]}
+
+
+def _gt(var, n, target):
+    # a loop guard on the engine's own failure counter: a step that keeps failing must not spin forever
+    return {"target_node": target, "description": f"{var} above {n}",
+            "condition": {"logic": "or", "conditions": [{"variable": var, "operator": "greater_than", "operand": n}]}}
 
 
 def _eq(var, val, target):
@@ -141,7 +147,7 @@ def _api_tool(tool, spec, lifecycle=False):
             leaf["default"] = "{{a_" + tool["name"] + "_" + f + "}}"
         props[f] = leaf
     ok_field = next((r["field"] for r in spec.get("response_fields") or [] if r.get("tool") == tool["name"] and r.get("role") == "ok"), "ok")
-    t = {"type": "function", "config": {"timeoutMs": 15000, "maxRetries": 0},
+    t = {"type": "function", "config": {"timeoutMs": 30000, "maxRetries": 0},
          "function": {"name": tool["name"], "handler": "__function__:api_call", "description": tool["summary"] or tool["name"],
                       "parameters": {"type": "object", "properties": {
                           "url": {"type": "string", "default": tool["url"]},
@@ -165,7 +171,7 @@ def _api_node(tool, spec, targets):
     return {"name": "do_" + tool["name"], "node_type": "api_request", "passthrough": True, "passthrough_default_transition": "brain",
             "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
             "pre_actions": [t], "response_mapping": [],
-            "transitions": [_eq("route", x, x) for x in targets] + [_always("brain")]}
+            "transitions": [_gt("do_" + tool["name"] + "_failure_count", 4, "bye")] + [_eq("route", x, x) for x in targets] + [_always("brain")]}
 
 
 def _ex(name, typ, desc, enum=None):

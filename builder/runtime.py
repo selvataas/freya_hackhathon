@@ -1050,8 +1050,10 @@ def make_offer(S, V, st, p, amount, date_iso, today, *lead):
     p["offer"] = [round(float(amount), 2), date_iso]
     st["stage"] = "offer"
     multi = len(st.get("products") or []) > 1
-    ask(V, st, "talk_main", *(list(lead) + [phrase(S, "offer", amount=fmt_amount(amount), when=when_words(S, date_iso, today),
-                                                  product=(p["spoken"] if multi else ""), for_product=(phrase(S, "for_product", product=p["spoken"]) if multi else ""))]))
+    question = phrase(S, "offer", amount=fmt_amount(amount), when=when_words(S, date_iso, today),
+                      product=(p["spoken"] if multi else ""), for_product=(phrase(S, "for_product", product=p["spoken"]) if multi else ""))
+    say(V, st, "talk_main", *(list(lead) + [question]))
+    st["last_ask"] = question  # a repeat asks only the question, without the lead (the floor note is said once)
 
 
 def attempt_offer(S, V, st, p, today, *lead):
@@ -1140,6 +1142,12 @@ def on_promise_result(S, V, st, today):
     if tool_ok(S, "create_promise", d):
         p["status"] = "recorded"
         return record_next(S, V, st, today)
+    if d is not None and p.get("unknown") and "already" in str(d.get("error") or "").lower():
+        # the earlier attempt got no answer but reached the bank: the bank now says the promise exists
+        p["status"] = "recorded"
+        return record_next(S, V, st, today)
+    if d is None:
+        p["unknown"] = True
     p["retries"] = int(p.get("retries") or 0) + 1
     if p["retries"] <= int((S.get("promise") or {}).get("retries") or 1):
         return call_tool(S, V, st, "create_promise", {"product_id": p["id"], "amount": p["amount"], "date": p["date"]})
