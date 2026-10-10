@@ -13,7 +13,7 @@ ROOT = HERE.parent
 
 sys.path.insert(0, str(HERE)); sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "tools"))
 import freya
-import openapi_tools, render
+import openapi_tools, render, selftest
 from extract import extract, check_verbatim, MODEL, EFFORT
 from spec_schema import normalize
 from trace import Trace
@@ -38,6 +38,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("paths", nargs="+")
     ap.add_argument("--no-cache", action="store_true")
+    ap.add_argument("--no-llm", action="store_true", help="never call the model: stop if the spec is not in the cache")
     ap.add_argument("--slot")
     ap.add_argument("--test", help="run the practice customers of this brief letter after the build")
     ap.add_argument("--dry", action="store_true", help="build and validate, do not save to Freya")
@@ -55,11 +56,25 @@ def main():
         api_text = pathlib.Path(api_path).read_text()
         _, tools = openapi_tools.load(api_path)
         trace.event("tools", names=sorted(tools))
-        raw, info = extract(briefs, api_text, trace, use_cache=not a.no_cache)
+        raw, info = extract(briefs, api_text, trace, use_cache=not a.no_cache, allow_llm=not a.no_llm)
         trace.event("spec", **info)
         spec = normalize(raw, tools, warn)
         check_verbatim(spec, briefs, warn)
         wf = render.render(spec, tools)
+        kinds = {}
+        for n in wf["nodes"].values():
+            kinds[n["node_type"]] = kinds.get(n["node_type"], 0) + 1
+        bank_tools = sorted(set([a["function"]["name"] for n in wf["nodes"].values() for a in n.get("pre_actions", []) if a["function"]["handler"] == "__function__:api_call"]
+                                + [t["function"]["name"] for t in wf.get("tools", [])]))
+        trace.event("rendered", nodes=len(wf["nodes"]), node_types=kinds, tools=len(bank_tools), tool_names=bank_tools,
+                    custom_situations=len(spec.get("custom_situations") or []), unplaced_rules=len(spec.get("unplaced_rules") or []))
+        t0 = time.time()
+        st = selftest.run(spec)
+        ok = sum(r["pass"] for r in st)
+        trace.event("selftest", about="local scenarios from the spec, fake bank, no model or platform call", passed=ok, total=len(st),
+                    seconds=round(time.time() - t0, 1), results=[{"name": r["name"], "pass": r["pass"], "problems": r["problems"][:3]} for r in st])
+        if ok < len(st):
+            warn(f"self-test: {len(st) - ok} of {len(st)} scenarios failed")
         out = ROOT / "out"
         out.mkdir(exist_ok=True)
         (out / f"{slot}.spec.json").write_text(json.dumps(spec, indent=1))
@@ -67,11 +82,11 @@ def main():
         v = freya.validate_workflow(slot, wf)
         trace.event("dry_run", result=v)
         if a.dry:
-            print(json.dumps({"slot": slot, "dry_run": v, "warnings": len(warnings)}))
+            print(json.dumps({"slot": slot, "dry_run": v, "selftest": f"{ok}/{len(st)}", "warnings": len(warnings)}))
             return
         ids = freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json"))
         trace.event("saved", slot=slot, **ids)
-        print(json.dumps({"slot": slot, **ids, "warnings": len(warnings)}))
+        print(json.dumps({"slot": slot, **ids, "selftest": f"{ok}/{len(st)}", "warnings": len(warnings)}))
         if a.test:
             cmd = [sys.executable, str(ROOT / "tools" / "run_cases.py"), ids["agent_id"], "--brief", a.test, "--out", str(ROOT / "results" / f"{slot}.json")]
             trace.event("test_start", command=" ".join(cmd[1:]))
@@ -83,7 +98,7 @@ def main():
         trace.event("error", error=repr(e))
         raise
     finally:
-        trace.event("end", warnings=len(warnings))
+        trace.event("end", warnings=len(warnings), build_seconds=round(time.time() - trace.t0, 1))
         trace.close()
 
 

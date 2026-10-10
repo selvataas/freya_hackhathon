@@ -242,12 +242,14 @@ def cache_key(briefs, openapi_text):
     return h.hexdigest()[:16]
 
 
-def extract(briefs, openapi_text, trace, use_cache=True):
+def extract(briefs, openapi_text, trace, use_cache=True, allow_llm=True):
     key = cache_key(briefs, openapi_text)
     path = CACHE / f"spec-{key}.json"
     if use_cache and path.exists():
         trace.event("spec_cache_hit", key=key)
         return json.loads(path.read_text()), {"cached": True, "key": key}
+    if not allow_llm:
+        raise SystemExit(f"--no-llm: no cached spec for this brief and model ({MODEL}), key {key}; nothing was called")
     user = _user(briefs, openapi_text)
     with concurrent.futures.ThreadPoolExecutor(2) as ex:
         futs = [ex.submit(_call, trace, f"extract spec from brief (run {i + 1} of 2)", INSTRUCTIONS, user) for i in range(2)]

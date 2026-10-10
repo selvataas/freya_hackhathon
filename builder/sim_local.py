@@ -12,7 +12,10 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import runtime
 
-CASES = {c["id"]: c for c in json.load(open(HERE.parent / "public-test-set.json"))}
+try:
+    CASES = {c["id"]: c for c in json.load(open(HERE.parent / "public-test-set.json"))}
+except Exception:
+    CASES = {}
 
 SCRIPTS = {
     "PUB-01": [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "14 March 1988"}, {"id_reply": "answer", "id_answer": "4471"},
@@ -89,12 +92,15 @@ VARIANTS.update({
                         {"reply": "propose", "date_phrase": "the thirtieth of October", "applies_to_all": "yes"}, {"reply": "question", "q_kind": "other"}, {"reply": "yes"}]),
 })
 for k, (base, turns) in VARIANTS.items():
-    CASES[k] = dict(CASES[base], id=k)
-    SCRIPTS[k] = turns
-CASES["PUB-01t"] = dict(CASES["PUB-01"], id="PUB-01t", timeout_first=True)
-SCRIPTS["PUB-01t"] = SCRIPTS["PUB-01"]
+    if base in CASES:
+        CASES[k] = dict(CASES[base], id=k)
+        SCRIPTS[k] = turns
+if "PUB-01" in CASES:
+    CASES["PUB-01t"] = dict(CASES["PUB-01"], id="PUB-01t", timeout_first=True)
+    SCRIPTS["PUB-01t"] = SCRIPTS["PUB-01"]
 # PUB-06c: the floor on Friday is refused, attempt 2 of the late band offers the floor on the deadline
-CASES["PUB-06c"] = dict(CASES["PUB-06"], id="PUB-06c", expected=dict(CASES["PUB-06"]["expected"], promises=[{"product_id": "p1", "amount": 637.5, "date": "2026-10-23"}]))
+if "PUB-06" in CASES:
+    CASES["PUB-06c"] = dict(CASES["PUB-06"], id="PUB-06c", expected=dict(CASES["PUB-06"]["expected"], promises=[{"product_id": "p1", "amount": 637.5, "date": "2026-10-23"}]))
 
 
 class Bank:
@@ -159,14 +165,14 @@ class Bank:
         return {"ok": True}
 
 
-def run_case(spec, cid, verbose=False):
-    case = CASES[cid]
+def simulate(spec, case, script):
+    """One call through the brain with a fake bank. Returns (bank, V, log, turns left)."""
     bank = Bank(case, spec)
     V = dict(case["variables"])
     V[(spec.get("variables") or {}).get("customer_id") or "customer_id"] = "c_x"
-    script = copy.deepcopy(SCRIPTS[cid])
+    script = copy.deepcopy(script)
     log = []
-    for _ in range(80):
+    for _ in range(120):
         runtime.brain(V, spec)
         ns = V.get("next_step")
         if ns.startswith("talk_"):
@@ -191,18 +197,28 @@ def run_case(spec, cid, verbose=False):
             log.append(("AGENT", "[bye] " + V.get("farewell", "")))
             break
     bank.outcome, bank.reason = V.get("final_outcome") or None, V.get("final_reason") or None
-    exp = case["expected"]
+    return bank, V, log, script
+
+
+def compare(bank, exp):
     problems = []
     if (bank.outcome, bank.reason) != (exp["outcome"], exp.get("reason")):
         problems.append(f"outcome {(bank.outcome, bank.reason)} expected {(exp['outcome'], exp.get('reason'))}")
     if sorted(bank.promises) != sorted((p["product_id"], p["amount"], p["date"]) for p in exp["promises"]):
         problems.append(f"promises {bank.promises} expected {[(p['product_id'], p['amount'], p['date']) for p in exp['promises']]}")
-    if sorted(bank.notes) != sorted((n["product_id"], n["reason"]) for n in exp["notes"]):
+    if exp.get("notes") is not None and sorted(bank.notes) != sorted((n["product_id"], n["reason"]) for n in exp["notes"]):
         problems.append(f"notes {bank.notes} expected {exp['notes']}")
     if sorted(bank.callbacks) != sorted((c["date"], c["time"]) for c in exp["callbacks"]):
         problems.append(f"callbacks {bank.callbacks} expected {exp['callbacks']}")
     if sorted(bank.transfers) != sorted(t["queue"] for t in exp["transfers"]):
         problems.append(f"transfers {bank.transfers} expected {exp['transfers']}")
+    return problems
+
+
+def run_case(spec, cid, verbose=False):
+    case = CASES[cid]
+    bank, V, log, script = simulate(spec, case, SCRIPTS[cid])
+    problems = compare(bank, case["expected"])
     if script:
         problems.append(f"{len(script)} scripted turns left unused")
     st = json.loads(V.get("st") or "{}")
