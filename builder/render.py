@@ -156,10 +156,16 @@ def _api_tool(tool, spec, lifecycle=False):
     return t
 
 
-def _api_node(tool, spec):
+def _api_node(tool, spec, targets):
+    """The tool's post-hook also runs the brain, so the next step is decided without another code-node run.
+    The hook writes `route`; if it did not run, `route` is still 'brain' and the node falls back to the brain node."""
+    t = _api_tool(tool, spec)
+    t["post_process_code"] = (t["post_process_code"] + "\n" + brain_code(spec) +
+                              "try:\n    vars['route'] = vars.get('next_step') or 'brain'\nexcept Exception:\n    pass\n")
     return {"name": "do_" + tool["name"], "node_type": "api_request", "passthrough": True, "passthrough_default_transition": "brain",
             "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
-            "pre_actions": [_api_tool(tool, spec)], "response_mapping": [], "transitions": [_always("brain")]}
+            "pre_actions": [t], "response_mapping": [],
+            "transitions": [_eq("route", x, x) for x in targets] + [_always("brain")]}
 
 
 def _ex(name, typ, desc, enum=None):
@@ -263,7 +269,7 @@ def render(spec, tools):
     nodes["brain"] = _code_node("brain", brain_code(spec), targets)
     nodes.update(_talk_nodes(spec))
     for t in used:
-        nodes["do_" + t] = _api_node(tools[t], spec)
+        nodes["do_" + t] = _api_node(tools[t], spec, targets)
     nodes["bye"] = {"name": "bye", "node_type": "end_call", "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
                     "transitions": [],
                     "terminal": {"type": "function", "function": {"name": "call_closed", "handler": "__function__:end_call",

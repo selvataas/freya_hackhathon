@@ -626,6 +626,7 @@ def call_tool(S, V, st, tool, values):
     for role, val in values.items():
         V["a_" + tool + "_" + tool_field(S, tool, role)] = "" if val is None else str(val)
     V["res_" + tool] = ""
+    V["route"] = "brain"
     V["next_step"] = "do_" + tool
     st["pending"] = "tool:" + tool
 
