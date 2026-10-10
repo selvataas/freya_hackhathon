@@ -1,0 +1,10 @@
+INTERNAL MEMO - Collections Operations
+Date: 6 November 2026
+Re: Changes to CP-7 effective immediately
+
+1. Segment "standard": the latest promise date is now the 8th working day after today (was the 10th).
+   Everything else in 7.2 stays as it is.
+2. Add 2026-11-20 to the bank holidays (branch system migration).
+3. Callbacks: the window now ends at 16:00 instead of 18:00. The start of the window does not change.
+4. The hardship desk is closed until further notice. Do not offer a transfer for illness, bereavement or job loss:
+   give the sympathy sentence and close as hardship. All other rules in 7.5 stay.

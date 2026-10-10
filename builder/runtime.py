@@ -653,15 +653,26 @@ def call_tool(S, V, st, tool, values):
     V["res_" + tool] = ""
     V["raw_" + tool] = ""
     V["route_" + tool] = "brain"
+    st["sc_" + tool] = int(to_float(V.get("do_" + tool + "_success_count")) or 0)
     V["next_step"] = "do_" + tool
     st["pending"] = "tool:" + tool
 
 
-def tool_result(V, tool):
-    # the post-hook writes res_<tool>; if the hook did not run, the node's response mapping wrote raw_<tool>
+def tool_result(V, tool, st=None):
+    """The post-hook writes res_<tool>. If the hook did not run, the engine's own flattened copy
+    do_<tool>_response.data.* is used, but only when the node's success counter moved since the dispatch."""
     for k in ("res_" + tool, "raw_" + tool):
         d = jload(V.get(k), None)
         if isinstance(d, dict):
+            return d
+    if st is not None and int(to_float(V.get("do_" + tool + "_success_count")) or 0) > int(st.get("sc_" + tool) or 0):
+        pre = "do_" + tool + "_response.data."
+        d = {}
+        for k in list(V.keys()):
+            if isinstance(k, str) and k.startswith(pre) and k.count(".") == 2:
+                v = V.get(k)
+                d[k[len(pre):]] = jload(v, v) if isinstance(v, str) and v[:1] in "[{" else v
+        if d:
             return d
     return None
 
@@ -755,9 +766,18 @@ def handle_human(S, V, st, node):
     return True
 
 
+def not_talking_rule(S):
+    try:
+        return int(((S.get("requests") or {}).get("not_talking") or {}).get("max_times") or 0)
+    except Exception:
+        return 0
+
+
 def count_not_talking(S, st):
+    """True when the brief's limit is reached. Without such a rule (0) it never closes the call by itself."""
     st["not_talking"] = int(st.get("not_talking") or 0) + 1
-    return st["not_talking"] >= int(((S.get("requests") or {}).get("not_talking") or {}).get("max_times") or 2)
+    mx = not_talking_rule(S)
+    return mx > 0 and st["not_talking"] >= mx
 
 
 # ---------------------------------------------------------------- phase: who is on the line
@@ -939,7 +959,8 @@ def on_identity_turn(S, V, st):
     if i >= len(qs):
         return start_account(S, V, st)
     if rk == "question" and not raw and not iso:
-        return ask_question(S, V, st, answer_for_question(S, q) or phrase(S, "no_info"))
+        ans = (phrase(S, "purpose_answer") or phrase(S, "no_info")) if q == "purpose" or not q else (answer_for_question(S, q) or phrase(S, "no_info"))
+        return ask_question(S, V, st, ans)
     joined = join(st.get("id_partial") or "", raw)
     status, val = normalize_answer(qs[i], joined, iso)
     if status == "ok":
@@ -954,7 +975,7 @@ def on_identity_turn(S, V, st):
 
 
 def on_verify_result(S, V, st):
-    d = tool_result(V, "verify_identity")
+    d = tool_result(V, "verify_identity", st)
     idn = S.get("identity") or {}
     qs = questions(S)
     i = min(int(st.get("q_index") or 0), max(0, len(qs) - 1))
@@ -994,7 +1015,7 @@ def start_account(S, V, st):
 
 
 def on_account_result(S, V, st, now):
-    d = tool_result(V, "get_account")
+    d = tool_result(V, "get_account", st)
     raw = products_from_result(S, d) if d is not None else []
     if not raw:
         st["account_errors"] = int(st.get("account_errors") or 0) + 1
@@ -1140,7 +1161,7 @@ def record_next(S, V, st, today):
 
 
 def on_promise_result(S, V, st, today):
-    d = tool_result(V, "create_promise")
+    d = tool_result(V, "create_promise", st)
     p = next((x for x in st.get("products") or [] if x.get("id") == st.get("recording")), None)
     if p is None:
         return after_records(S, V, st, today)
@@ -1284,6 +1305,8 @@ def on_main_turn(S, V, st, now):
         if not multi:
             st["situation"] = "dispute"
         return readback(S, V, st, today, lead)
+    if reply == "not_talking" and not proposes and not_talking_rule(S) <= 0:
+        reply = "no"  # no rule for it in the brief: it is a refusal like any other
     if reply == "not_talking" and not proposes:
         if count_not_talking(S, st):
             mark_open(st, "refused")
@@ -1453,7 +1476,7 @@ def run(V, S):
     elif pend == "tool:add_note":
         after_records(S, V, st, today)
     elif pend == "tool:schedule_callback":
-        d = tool_result(V, "schedule_callback")
+        d = tool_result(V, "schedule_callback", st)
         if tool_ok(S, "schedule_callback", d):
             finish(S, V, st, "callback", phrase(S, "callback_confirm", date=fmt_date(D.fromisoformat(st["cb"][0]), today), time=st["cb"][1]))
         else:

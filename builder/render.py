@@ -14,7 +14,8 @@ def _code_node(name, code, targets):
                              "parameters": {"type": "object", "properties": {
                                  "code": {"type": "string", "default": code},
                                  "timeout_ms": {"type": "number", "default": 20000}}}}}],
-            "transitions": [_gt(name + "_failure_count", 2, "bye")] + [_eq("next_step", t, t) for t in targets] + [_always("bye")]}
+            # a brain run that failed leaves next_step from the run before: never act on it (it could repeat a bank call)
+            "transitions": [_gt(name + "_failure_count", 0, "bye")] + [_eq("next_step", t, t) for t in targets] + [_always("bye")]}
 
 
 def _gt(var, n, target):
@@ -202,7 +203,7 @@ def extraction(spec, phase):
                 "deceased = says the customer has died; human = asks for a human or a real person; not_talking = says they do not want to talk; refuses = refuses to help; "
                 "question = only asks a question; unclear = hello, go ahead, who is this, or anything else.",
                 ["confirmed", "other_person", "wrong_number", "deceased", "human", "not_talking", "refuses", "question", "unclear"]),
-            _ex("cb_phrase", "string", "If the LAST message says when the customer can be reached: the day and time words exactly as said, e.g. 'tomorrow morning around eleven'. Empty otherwise."),
+            _ex("cb_phrase", "string", "If the LAST message says when the customer can be reached: the day and time words exactly as said, e.g. 'Thursday after two'. Empty otherwise."),
             q_kind]
     if phase == "talk_id":
         return [
@@ -214,16 +215,16 @@ def extraction(spec, phase):
             q_kind]
     return [
         _ex("reply", "string", "What the LAST customer message does. yes = agrees to what the agent just asked or offered, or confirms; no = says no or cannot, without naming a day or an amount; "
-            "propose = names a day or an amount themselves; too_much = says the amount is too much or too high; vague = names only a vague period (next week, end of the month, when the salary comes); "
-            "hardship = mentions illness, a death in the family, losing their job or a similar hardship" + _examples(hs.get("trigger_examples")) + "; "
+            "propose = names a day or an amount themselves; too_much = says the amount is too much or too high; vague = names only a period or a condition, not a day; "
+            "hardship = describes a personal hardship that makes paying hard" + _examples(hs.get("trigger_examples")) + "; "
             "already_paid = says they already paid" + _examples((rq.get("already_paid") or {}).get("trigger_examples")) + "; "
-            "dispute = says the debt or product is not theirs, never had it, or it was closed or paid off in the past" + _examples((rq.get("dispute") or {}).get("trigger_examples")) + "; "
-            "restructuring = asks for a new payment plan, lower instalments or restructuring" + _examples((rq.get("restructuring") or {}).get("trigger_examples")) + "; "
+            "dispute = denies that the debt or the product is theirs" + _examples((rq.get("dispute") or {}).get("trigger_examples")) + "; "
+            "restructuring = asks to change the repayment terms" + _examples((rq.get("restructuring") or {}).get("trigger_examples")) + "; "
             "human = asks for a human or a real person; not_talking = does not want to talk; question = asks a question; "
             "change_recorded = wants to change or cancel a promise that was already recorded; other = anything else. "
             "When a message both refuses and names a day or amount, use propose. When it mentions hardship, use hardship.",
             ["yes", "no", "propose", "too_much", "vague", "hardship", "already_paid", "dispute", "restructuring", "human", "not_talking", "question", "change_recorded", "other"]),
-        _ex("date_phrase", "string", "The words the customer used in the LAST message for the day they will PAY, exactly as said (e.g. 'this Friday', 'the 26th', 'Monday the 26th', 'next week', 'tomorrow'). "
+        _ex("date_phrase", "string", "The words the customer used in the LAST message for the day they will PAY, exactly as said (e.g. 'Thursday', 'on the 3rd', 'the ninth of March'). "
             "If they correct themselves, only the corrected day. Not days that are about anything else. Empty if they named no payment day."),
         _ex("amount", "string", "The amount the customer offers to pay in the LAST message, in digits, e.g. 455.50. If they correct themselves, only the corrected amount. Empty if they named no amount."),
         _ex("applies_to_all", "string", "When the customer names a day or amount: yes = for all products / everything; no = only for one product; unknown = not said.", ["yes", "no", "unknown"]),

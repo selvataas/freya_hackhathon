@@ -1,0 +1,465 @@
+{
+ "openapi": "3.0.3",
+ "info": {
+  "title": "Nordwind Bank tools (test variant)",
+  "version": "test"
+ },
+ "servers": [
+  {
+   "url": "https://nordwind-mock.example/v2"
+  }
+ ],
+ "components": {},
+ "paths": {
+  "/verify_identity": {
+   "post": {
+    "summary": "Check one security answer.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "client_ref": {
+          "type": "string"
+         },
+         "question": {
+          "type": "string",
+          "enum": [
+           "postcode",
+           "birth_year"
+          ]
+         },
+         "value": {
+          "type": "string",
+          "description": "postcode as written, birth_year as four digits"
+         }
+        },
+        "required": [
+         "client_ref",
+         "question",
+         "value"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "`ok` is false when the action was not carried out.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "ok": {
+           "type": "boolean"
+          },
+          "error": {
+           "type": "string"
+          },
+          "correct": {
+           "type": "boolean"
+          },
+          "attempts_remaining": {
+           "type": "integer"
+          },
+          "complete": {
+           "type": "boolean"
+          }
+         }
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "The service failed. Nothing was recorded."
+     }
+    }
+   }
+  },
+  "/get_account": {
+   "post": {
+    "summary": "The overdue accounts. Refused until identity is confirmed.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "client_ref": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "client_ref"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "`ok` is false when the action was not carried out.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "ok": {
+           "type": "boolean"
+          },
+          "error": {
+           "type": "string"
+          },
+          "accounts": {
+           "type": "array",
+           "items": {
+            "type": "object",
+            "properties": {
+             "id": {
+              "type": "string"
+             },
+             "kind": {
+              "type": "string",
+              "enum": [
+               "card",
+               "overdraft",
+               "car_loan"
+              ]
+             },
+             "last_digits": {
+              "type": "string",
+              "description": "cards only"
+             },
+             "overdue_amount": {
+              "type": "number"
+             },
+             "days_overdue": {
+              "type": "integer"
+             },
+             "min_due": {
+              "type": "number"
+             },
+             "monthly_payment": {
+              "type": "number"
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "The service failed. Nothing was recorded."
+     }
+    }
+   }
+  },
+  "/create_promise": {
+   "post": {
+    "summary": "Register a payment commitment.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "client_ref": {
+          "type": "string"
+         },
+         "account_id": {
+          "type": "string"
+         },
+         "promised_amount": {
+          "type": "number"
+         },
+         "pay_date": {
+          "type": "string",
+          "format": "date"
+         }
+        },
+        "required": [
+         "client_ref",
+         "account_id",
+         "promised_amount",
+         "pay_date"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "`ok` is false when the action was not carried out.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "ok": {
+           "type": "boolean"
+          },
+          "error": {
+           "type": "string"
+          },
+          "commitment_id": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "The service failed. Nothing was recorded."
+     }
+    }
+   }
+  },
+  "/add_note": {
+   "post": {
+    "summary": "Record why an account has no commitment.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "client_ref": {
+          "type": "string"
+         },
+         "account_id": {
+          "type": "string"
+         },
+         "code": {
+          "type": "string",
+          "enum": [
+           "declined",
+           "hardship",
+           "contested",
+           "settled",
+           "system_fault"
+          ]
+         },
+         "comment": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "client_ref",
+         "account_id",
+         "code",
+         "comment"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "`ok` is false when the action was not carried out.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "ok": {
+           "type": "boolean"
+          },
+          "error": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "The service failed. Nothing was recorded."
+     }
+    }
+   }
+  },
+  "/schedule_callback": {
+   "post": {
+    "summary": "Book a callback.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "client_ref": {
+          "type": "string"
+         },
+         "day": {
+          "type": "string",
+          "format": "date"
+         },
+         "at": {
+          "type": "string",
+          "description": "HH:MM"
+         }
+        },
+        "required": [
+         "client_ref",
+         "day",
+         "at"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "`ok` is false when the action was not carried out.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "ok": {
+           "type": "boolean"
+          },
+          "error": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "The service failed. Nothing was recorded."
+     }
+    }
+   }
+  },
+  "/transfer_to_agent": {
+   "post": {
+    "summary": "Hand the call to a team.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "client_ref": {
+          "type": "string"
+         },
+         "team": {
+          "type": "string",
+          "enum": [
+           "care",
+           "payment_plans",
+           "operator"
+          ]
+         }
+        },
+        "required": [
+         "client_ref",
+         "team"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "`ok` is false when the action was not carried out.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "ok": {
+           "type": "boolean"
+          },
+          "error": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "The service failed. Nothing was recorded."
+     }
+    }
+   }
+  },
+  "/close_call": {
+   "post": {
+    "summary": "End the call. Always last.",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "type": "object",
+        "properties": {
+         "client_ref": {
+          "type": "string"
+         },
+         "result": {
+          "type": "string",
+          "enum": [
+           "committed",
+           "settled",
+           "handed_over",
+           "no_commitment",
+           "unverified",
+           "no_contact"
+          ]
+         },
+         "code": {
+          "type": "string",
+          "description": "see the brief"
+         }
+        },
+        "required": [
+         "client_ref",
+         "result",
+         "code"
+        ]
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "`ok` is false when the action was not carried out.",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "ok": {
+           "type": "boolean"
+          },
+          "error": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     },
+     "500": {
+      "description": "The service failed. Nothing was recorded."
+     }
+    }
+   }
+  }
+ }
+}

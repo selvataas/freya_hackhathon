@@ -1,8 +1,10 @@
 """Run the brain against scripted customers and a fake bank, without the platform. A development check.
 
-    python3 builder/sim_local.py out/brief-a.spec.json [case_id ...] [-v]
+    python3 builder/sim_local.py out/brief-a.spec.json [case_id ...] [-v] [--cases tests/variants/cases.json]
 
 Each script turn is what the extraction model would produce for one customer message.
+The fake bank names its fields as the spec maps them, so a brief whose tool API renames fields works too.
+A case file holds cases in the public-test-set form plus a "script" list; their products carry their own ids.
 """
 import copy, json, pathlib, sys
 
@@ -72,13 +74,29 @@ CASES["PUB-06c"] = dict(CASES["PUB-06"], id="PUB-06c", expected=dict(CASES["PUB-
 
 
 class Bank:
-    def __init__(self, case):
+    def __init__(self, case, spec=None):
+        self.spec = spec or {}
         self.case, self.wrong, self.ok = case, 0, set()
         self.promises, self.notes, self.callbacks, self.transfers, self.calls = [], [], [], [], []
         self.outcome = self.reason = None
         self.fail = dict((f["tool"], f["fail_first_n"]) for f in case.get("faults") or [])
 
-    def call(self, tool, a):
+    def call(self, tool, args):
+        # request fields -> roles, and the response roles -> the tool API's field names
+        a = dict((self._role(tool, k), v) for k, v in args.items())
+        r = self._call(tool, a)
+        if not isinstance(r, dict):
+            return r
+        out = dict((runtime.resp_field(self.spec, tool, k), v) for k, v in r.items())
+        return out
+
+    def _role(self, tool, field):
+        for f in self.spec.get("tool_fields") or []:
+            if f.get("tool") == tool and f.get("field") == field:
+                return f.get("role")
+        return field
+
+    def _call(self, tool, a):
         self.calls.append(tool)
         if tool == "create_promise" and self.case.get("timeout_first") and not self.calls.count(tool) > 1:
             self.promises.append((a["product_id"], round(float(a["amount"]), 2), a["date"]))
@@ -94,12 +112,14 @@ class Bank:
                 self.ok.add(a["field"])
             else:
                 self.wrong += 1
-            r = {"ok": True, "verified": right, "wrong_answers_left": max(0, 3 - self.wrong), "all_verified": len(self.ok) >= 2}
-            return r
+            need = len(self.case["identity"])
+            mx = int(((self.spec.get("identity") or {}).get("max_wrong_total")) or 3)
+            return {"ok": True, "verified": right, "wrong_answers_left": max(0, mx - self.wrong), "all_verified": len(self.ok) >= need}
         if tool == "get_account":
-            if len(self.ok) < 2:
+            if len(self.ok) < len(self.case["identity"]):
                 return {"ok": False, "error": "identity not verified"}
-            return {"ok": True, "products": [dict(p, product_id=f"p{i + 1}") for i, p in enumerate(self.case["products"])]}
+            pid = runtime.resp_field(self.spec, "get_account", "product_id")
+            return {"ok": True, "products": [p if pid in p else dict(p, **{pid: f"p{i + 1}"}) for i, p in enumerate(self.case["products"])]}
         if tool == "create_promise":
             self.promises.append((a["product_id"], round(float(a["amount"]), 2), a["date"]))
             return {"ok": True, "promise_id": "x"}
@@ -117,8 +137,9 @@ class Bank:
 
 def run_case(spec, cid, verbose=False):
     case = CASES[cid]
-    bank = Bank(case)
-    V = dict(case["variables"], customer_id="c_x")
+    bank = Bank(case, spec)
+    V = dict(case["variables"])
+    V[(spec.get("variables") or {}).get("customer_id") or "customer_id"] = "c_x"
     script = copy.deepcopy(SCRIPTS[cid])
     log = []
     for _ in range(80):
@@ -171,6 +192,15 @@ def run_case(spec, cid, verbose=False):
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     spec = json.load(open(args[0]))
+    if "--cases" in sys.argv:
+        path = sys.argv[sys.argv.index("--cases") + 1]
+        args = [a for a in args if a != path]
+        CASES.clear(); SCRIPTS.clear()
+        for c in json.load(open(path)):
+            if c.get("spec") and c["spec"] not in args[0]:
+                continue
+            CASES[c["id"]] = c
+            SCRIPTS[c["id"]] = c["script"]
     ids = args[1:] or sorted(SCRIPTS)
     ok = sum(run_case(spec, i, "-v" in sys.argv) for i in ids)
     print(f"\n{ok} / {len(ids)} passed locally")

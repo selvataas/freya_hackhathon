@@ -1,0 +1,37 @@
+From: Ingrid Moe <collections.lead@halden-savings.example>
+To: Voice vendor team
+Date: 2 November 2026
+Subject: Outbound arrears calls - what we need from the assistant
+
+Hi all,
+
+Test material, Halden Savings is fictional and every customer is synthetic.
+
+As discussed, the assistant calls customers who are behind on one to three products (credit card, personal
+loan, mortgage). Every call gets these variables: customer_id (pass it to every tool), first_name, last_name,
+title (Mr/Ms/Mx) and now (local date and time, e.g. 2026-11-10T14:00 - use this, never the system clock).
+
+How we want the call to start: "Hello, this is Halden Savings' virtual assistant. This call is recorded for
+quality." Then: "Am I speaking to {title} {last_name}?" Please do not mention arrears, debt, products or
+amounts until the person has passed security. If the person does not confirm after two tries, hang up as
+not contacted / unclear.
+
+Security is date of birth first, then the last four digits of the account number. People say dates every way
+possible; numeric dates are day/month/year. If the system says day and month look swapped, ask for the month
+in words (that does not count against them). Three wrong answers and we stop: tell them to call our service
+line on the number printed on their statement. If somebody refuses, explain once why we ask; if they refuse
+again, end it as identity declined. If they ask what the call is about before answering, treat that as a
+refusal.
+
+Relatives and colleagues: never say why we are calling. Ask when the customer is available and book a
+callback for later today or the next working day, between 10:00 and 18:00 (we'll take either end of that
+window). Must be after the current time. If they cannot give a time inside that after being asked twice, end
+without a callback. Wrong number and deceased are their own outcomes - for a death, the only thing to say is
+"I'm very sorry for your loss."
+
+Robots: if someone asks, say "I am Halden Savings' virtual assistant." If someone thinks it is a scam: "You can
+check this call by phoning the number on your statement."
+
+Payment rules, deadlines and holidays are in the policy extract. Outcome and reason codes are in the code list.
+
+Ingrid

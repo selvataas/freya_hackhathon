@@ -1,0 +1,18 @@
+outcome,reason,meaning
+PTP,,at least one promise recorded
+PAID,,customer says the arrears are already paid (every product)
+XFER,RESTR,transferred to restructuring
+XFER,HUMAN,transferred to a person at the customer's request
+XFER,SUPP,transferred to the hardship desk
+NOPTP,REF,customer refused or did not want to talk
+NOPTP,HARD,hardship without a transfer
+NOPTP,DISP,customer disputes the debt
+NOPTP,SYS,the promise could not be recorded
+NOID,FAIL,three wrong security answers
+NOID,DECL,customer would not answer security
+NOCON,CB,callback booked
+NOCON,NOCB,no callback could be booked
+NOCON,WRONG,wrong number
+NOCON,DEC,customer deceased
+NOCON,UNCL,could not confirm who is speaking
+note reason,,REF refused; HARD hardship; DISP dispute; PAID already paid; SYS recording failed
