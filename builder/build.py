@@ -60,6 +60,9 @@ def main():
         trace.event("spec", **info)
         spec = normalize(raw, tools, warn)
         check_verbatim(spec, briefs, warn)
+        spec, neutral = render.neutral_phrases(spec)
+        if neutral:
+            trace.event("phrases_neutralized", about="success words removed from non-verbatim lines said before any result", changes=neutral)
         wf = render.render(spec, tools)
         kinds = {}
         for n in wf["nodes"].values():

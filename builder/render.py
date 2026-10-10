@@ -1,5 +1,5 @@
 """Turn a normalized spec and the tool API into a Freya workflow. Deterministic: same input, same JSON."""
-import ast, json, pathlib
+import ast, json, pathlib, re
 
 RUNTIME = (pathlib.Path(__file__).parent / "runtime.py").read_text()
 EMPTY = "none"  # the value a consumed enum variable is reset to; the platform rejects "" for an enum
@@ -291,6 +291,60 @@ def _talk_nodes(spec):
                          "max_node_turns": 60, "max_turn_transition": "brain",
                          "transitions": [_always("brain")]}
     return out
+
+
+# phrases said after a result is known: they may and must use the words of success
+RESULT_PHRASES = ("recorded", "after_promise", "callback_confirm", "changes_after_record", "service_error")
+CALL_RECORDING = re.compile(r"\b(this|the|our|your)\s+(call|conversation)\s+(is|will be|may be|is being|might be|can be)\s+(\w+)(\s+for\s+[\w\s]+?)?(?=[.,;!?]|$)", re.I)
+
+
+def success_words(spec):
+    """The words the agent uses to report a success: from the builder's own success lines and the spec's
+    recording line. Words a customer could mistake for a success report if they come earlier."""
+    import runtime
+    texts = [runtime.RETRIED_OK, runtime.NOT_SAVED_FINAL, ((spec.get("phrases") or {}).get("recorded") or {}).get("text") or ""]
+    words = set()
+    for t in texts:
+        for w in re.findall(r"[A-Za-z]+", t.lower()):
+            if len(w) > 4 and w.endswith("ed") and w not in ("tried",):
+                words.add(w)
+    return sorted(words)
+
+
+def neutral_phrases(spec):
+    """In phrases that are not the brief's exact words and are said before any result, replace the words of
+    success with neutral ones (e.g. 'this call is recorded' -> 'we keep a recording of this call').
+    Phrases marked verbatim are never touched. Returns (spec, changes)."""
+    import copy
+    s = copy.deepcopy(spec)
+    words = success_words(s)
+    changes = []
+    if not words:
+        return s, changes
+    hit = re.compile(r"\b(" + "|".join(words) + r")\b", re.I)
+    for key, p in (s.get("phrases") or {}).items():
+        if key in RESULT_PHRASES or not isinstance(p, dict) or p.get("verbatim"):
+            continue
+        text = p.get("text") or ""
+        if not hit.search(text):
+            continue
+        new = CALL_RECORDING.sub(lambda m: ("we keep a recording of this " + m.group(2).lower() + (m.group(5) or "")) if hit.fullmatch(m.group(4)) else m.group(0), text)
+        # a negated use ("cannot be recorded") claims nothing: keep it. "will be recorded" -> "will be set".
+        neg = re.compile(r"\b(not|cannot|can't|could not|couldn't|won't|never)\s+(be\s+)?$", re.I)
+
+        def fallback(m):
+            before = new[:m.start()]
+            if neg.search(before):
+                return m.group(0)
+            if re.search(r"\bwill\s+be\s+$", before, re.I):
+                return "set"
+            return "kept on file"
+        new = hit.sub(fallback, new)
+        new = re.sub(r"(^|[.!?]\s+)(we keep)", lambda m: m.group(1) + "We keep", new)
+        if new != text:
+            p["text"] = new
+            changes.append({"phrase": key, "from": text, "to": new})
+    return s, changes
 
 
 def render(spec, tools):
