@@ -82,6 +82,18 @@ LLM_MODEL=claude-opus-5-5 python3 builder/build.py final/<name2>/<name2> final/<
 The last line is JSON: `{"slot", "workflow_id", "agent_id", "selftest", "warnings"}`. The trace is the newest
 `traces/<time>-<slot>.jsonl`.
 
+## 2a. Testing during the final window (20:00 to 23:00)
+
+Platform tests may be limited or slow while every team runs simulations at once (one simulation at a time per
+workspace; a ten-customer run took up to 8 minutes per run on a busy evening). So:
+
+1. Rely first on what runs locally and costs nothing: the build's own self-test (in the trace, every scenario on many
+   calendar days) and, if useful, `python3 builder/selftest.py out/<slot>.spec.json`.
+2. There are no practice customers for a final brief, so `run_cases.py` cannot score it. A platform check is only a last
+   look: one chat turn to see the workflow starts, and, if there is time, a few calls with the practice customers of the
+   kit run against the new agent only when the final brief is close enough for their checks to make sense.
+3. Never wait for a platform test before exporting and committing a good build. Export first; test after.
+
 ## 3. Checks after each build
 
 1. The last line has a `workflow_id` and an `agent_id`. A traceback means a crash: see section 5.
