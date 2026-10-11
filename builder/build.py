@@ -53,7 +53,7 @@ def main():
     ap.add_argument("--slot")
     ap.add_argument("--test", help="run the practice customers of this brief letter after the build")
     ap.add_argument("--dry", action="store_true", help="build and validate, do not save to Freya")
-    ap.add_argument("--ask-client", action="store_true", help="ask the client about unclear points (also CLIENT_MODE=1); off by default")
+    ap.add_argument("--ask-client", action="store_true", help="ask the client about unclear points (also CLIENT_MODE=1); off by default, refused without --test")
     ap.add_argument("--client-answers", default=os.environ.get("CLIENT_ANSWERS", str(ROOT / "tests" / "client-answers.json")),
                     help="the file transport's fixed answers")
     a = ap.parse_args()
@@ -73,7 +73,13 @@ def main():
         raw, info = extract(briefs, api_text, trace, use_cache=not a.no_cache, allow_llm=not a.no_llm)
         trace.event("spec", **info)
         if ask_client.enabled(a.ask_client):
-            raw = ask_client.run(raw, briefs, ask_client.FileTransport(a.client_answers), trace, allow_llm=not a.no_llm, use_cache=not a.no_cache)
+            transport = ask_client.FileTransport(a.client_answers)
+            why = ask_client.refusal(transport, testing=bool(a.test))
+            if why:
+                trace.event("ask_client disabled", reason=why)
+                print(f"ask_client disabled: {why}", file=sys.stderr)
+            else:
+                raw = ask_client.run(raw, briefs, transport, trace, allow_llm=not a.no_llm, use_cache=not a.no_cache)
         spec = normalize(raw, tools, warn)
         check_verbatim(spec, briefs, warn)
         spec, neutral = render.neutral_phrases(spec)

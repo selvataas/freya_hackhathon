@@ -5,6 +5,10 @@ the extraction prompt and the spec cache are not touched.
 
     spec -> questions (one model call) -> transport (who answers) -> changes (one model call) -> checked spec
 
+Guard: the file transport's answers were written by people. Outside a test run (build.py --test) the layer refuses to run
+even when it is turned on, and build.py writes "ask_client disabled" to the trace: answers people wrote after reading a
+brief must never reach a submitted agent.
+
 The transport is replaceable. Today there is one: FileTransport, a local JSON file with fixed answers. When the
 organisers publish how a simulated client is reached, a new transport with the same ask() method plugs in here.
 The model calls are passed in as a function, so the layer can be tested without any API call.
@@ -38,6 +42,13 @@ value it replaces."""
 
 def enabled(flag=False):
     return bool(flag) or os.environ.get("CLIENT_MODE", "").strip().lower() in ("1", "true", "yes", "on", "file")
+
+
+def refusal(transport, testing):
+    """Why the layer must not run, or None. A local file of fixed answers is allowed only in a test run (--test)."""
+    if isinstance(transport, FileTransport) and not testing:
+        return "the answers come from a local file and this is not a test run (--test)"
+    return None
 
 
 class FileTransport:

@@ -54,6 +54,10 @@ def main():
     if old is not None:
         os.environ["CLIENT_MODE"] = old
 
+    file_t = ask_client.FileTransport(ROOT / "tests" / "client-answers.json")
+    check(ask_client.refusal(file_t, testing=False) is not None, "the file transport is refused outside a test run")
+    check(ask_client.refusal(file_t, testing=True) is None, "the file transport is allowed in a test run (--test)")
+
     tmp = pathlib.Path(tempfile.mkdtemp())
     ask_client.CACHE = tmp  # keep the test's cache out of the real one
     transport = ask_client.FileTransport(ROOT / "tests" / "client-answers.json")

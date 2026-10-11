@@ -46,6 +46,7 @@ Options:
 | `--no-llm` | Never call the model: stop if the spec is not in the cache |
 | `--slot NAME` | Use another slot name |
 | `--test A` | After the build, run the kit's practice customers of that brief letter |
+| `--ask-client` | Ask the client about unclear points (also `CLIENT_MODE=1`). Off by default. With the local answer file it runs only together with `--test`; otherwise the builder skips it and writes `ask_client disabled` to the trace. Never used for a final build. |
 
 ## Requirements
 

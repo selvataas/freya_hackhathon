@@ -17,6 +17,7 @@ cd freya_hackhathon
 git pull                                   # the version we submit
 source env.sh                              # FREYA_API_KEY, FREYA_API_URL, FREYA_BANK_TEAM_KEY, ANTHROPIC_API_KEY
 unset LLM_MODEL BUILDER_MODEL                # the builder then uses its default, claude-opus-5-5
+unset CLIENT_MODE CLIENT_ANSWERS             # ask_client stays off in the final
 python3 --version                          # 3.9 or newer; no packages needed
 python3 -c "import sys; sys.path.insert(0,'builder'); import extract; print(extract.MODEL)"   # claude-opus-5-5
 ```
@@ -118,17 +119,27 @@ workspace; a ten-customer run took up to 8 minutes per run on a busy evening). S
 4. The trace has: `start`, every `model_call` (model, purpose, tokens), `spec_compare`, `rendered` (nodes, tools),
    `selftest`, `dry_run` (valid), `saved` (workflow and agent id), `end` (build_seconds).
    It has no `spec_cache_hit`: a submitted build reads its spec from the brief, with `--no-cache`.
-5. Read `out/<slot>.spec.json` against the brief. Reading is allowed, changing is not. Look at:
+5. **ask_client is never turned on in the final**: no `--ask-client`, no `CLIENT_MODE`. The trace must have no
+   `client_` event:
+
+```bash
+grep -c '"event": "client_' traces/hidden-N.jsonl   # must be 0
+grep -c 'ask_client disabled' traces/hidden-N.jsonl  # 0; 1 means CLIENT_MODE was set: the layer did not run, unset it anyway
+```
+
+   The builder also guards this itself: with a local answer file and no `--test`, it refuses to run the layer and
+   writes `ask_client disabled` to the trace.
+6. Read `out/<slot>.spec.json` against the brief. Reading is allowed, changing is not. Look at:
    call variable names, identity questions and wrong-answer limit, holidays, bands and deadlines, persuasion attempts,
    floor fields, outcome rows (`outcomes`), `custom_situations`, `unplaced_rules` (short or empty is normal),
    and for raw material: was every change of the memo applied.
-6. No key in the trace or the log:
+7. No key in the trace or the log:
 
 ```bash
 grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/2*-<slot>.jsonl traces/hidden-N.log traces/hidden-N.jsonl   # every count must be 0
 ```
 
-7. Optional, if time is left: one chat turn against the new workflow to see the opening line (a chat skips the first code
+8. Optional, if time is left: one chat turn against the new workflow to see the opening line (a chat skips the first code
    step, so only use it to see that the workflow starts).
 
 ## 4. Export, commit, submit
@@ -241,6 +252,7 @@ and without touching the workflow on Freya.
 - Do not write anything from a final brief into the builder, the prompts or a test: no holiday, no outcome name, no phrase.
 - Do not edit a workflow on the platform, in the dashboard or with a hand-made PUT.
 - Do not change `freya.py`, `AGENT_LLM` or the agent model.
+- Do not turn on ask_client (`--ask-client`, `CLIENT_MODE`) for a final build.
 - Do not commit `env.sh`, `.env` or a key. `git status` before every commit.
 - Do not submit a build that read its spec from the cache (`spec_cache_hit` in its trace). Submitted builds run with `--no-cache`.
 - Do not submit a workflow and a trace from different runs.
