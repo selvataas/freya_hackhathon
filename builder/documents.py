@@ -138,11 +138,11 @@ PDF_SYSTEM = ("You write out the full text of a bank document, word for word, in
               "translate nothing, comment on nothing.")
 
 
-def pdf_text(path, trace, allow_llm=True):
+def pdf_text(path, trace, allow_llm=True, use_cache=True):
     data = pathlib.Path(path).read_bytes()
     key = hashlib.sha256(data).hexdigest()[:16]
     cp = CACHE / f"pdf-{key}.md"
-    if cp.exists():
+    if use_cache and cp.exists():
         trace.event("pdf_cache_hit", file=pathlib.Path(path).name, key=key)
         return cp.read_text()
     if not allow_llm:
@@ -161,12 +161,12 @@ IMAGE_SYSTEM = ("You write out a drawing from a bank's documents (for example a 
                 "numbered Markdown list in the order of the flow. Add nothing, translate nothing, comment on nothing.")
 
 
-def image_text(path, trace, allow_llm=True):
+def image_text(path, trace, allow_llm=True, use_cache=True):
     """A drawing, written out as text by the model (cached by the file's hash)."""
     data = pathlib.Path(path).read_bytes()
     key = hashlib.sha256(data).hexdigest()[:16]
     cp = CACHE / f"image-{key}.md"
-    if cp.exists():
+    if use_cache and cp.exists():
         trace.event("image_cache_hit", file=pathlib.Path(path).name, key=key)
         return cp.read_text()
     if not allow_llm:
@@ -242,7 +242,7 @@ def files_of(paths):
     return out
 
 
-def read(paths, trace, allow_llm=True):
+def read(paths, trace, allow_llm=True, use_cache=True):
     """[(name, text, path)] for every document that can be read; the others are named in the trace."""
     docs, skipped = [], []
     for name, f in files_of(paths):
@@ -259,9 +259,9 @@ def read(paths, trace, allow_llm=True):
             elif ext in (".xlsx", ".xlsm"):
                 docs.append((name, xlsx_text(f), f))
             elif ext == ".pdf":
-                docs.append((name, pdf_text(f, trace, allow_llm), f))
+                docs.append((name, pdf_text(f, trace, allow_llm, use_cache), f))
             elif ext in IMAGES:
-                docs.append((name, image_text(f, trace, allow_llm), f))
+                docs.append((name, image_text(f, trace, allow_llm, use_cache), f))
             else:
                 skipped.append({"file": name, "why": "a file type the builder does not read"})
         except SystemExit:
@@ -287,7 +287,7 @@ CONTRACT_SYSTEM = ("You turn a bank's service contract into one OpenAPI 3 JSON d
 CONTRACT_WORDS = re.compile(r"contract|openapi|swagger|api|service|servis|hizmet|s[oö]zle[sş]me|endpoint", re.I)
 
 
-def contract(docs, trace, allow_llm=True):
+def contract(docs, trace, allow_llm=True, use_cache=True):
     """The path of the case's OpenAPI JSON. Without one, the model writes it from the documents that describe the
     services (cached by their text)."""
     found = [p for _, _, p in docs if p.suffix.lower() == ".json" and is_openapi(p)]
@@ -302,7 +302,7 @@ def contract(docs, trace, allow_llm=True):
     text = "\n\n".join(f'<document file="{n}">\n{t}\n</document>' for n, t in cands)
     key = hashlib.sha256(text.encode()).hexdigest()[:16]
     cp = CACHE / f"contract-{key}.json"
-    if not cp.exists():
+    if not use_cache or not cp.exists():
         if not allow_llm:
             raise SystemExit(f"--no-llm: the service contract has not been turned into OpenAPI yet (key {key}); nothing was called")
         import extract

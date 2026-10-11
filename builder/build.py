@@ -84,9 +84,9 @@ def main():
     trace.event("start", briefs=brief_paths, tool_api=None if mock_url else api_path, mock_url=mock_url, slot=slot, builder_model=MODEL, effort=EFFORT, agent_llm=freya.AGENT_LLM,
                 **git_state())
     try:
-        docs = documents.read(brief_paths, trace, allow_llm=not a.no_llm)
+        docs = documents.read(brief_paths, trace, allow_llm=not a.no_llm, use_cache=not a.no_cache)
         if mock_url:
-            api_path = documents.contract(docs, trace, allow_llm=not a.no_llm)
+            api_path = documents.contract(docs, trace, allow_llm=not a.no_llm, use_cache=not a.no_cache)
         briefs = [(n, t) for n, t, p in docs if p.resolve() != pathlib.Path(api_path).resolve()]
         api_text = pathlib.Path(api_path).read_text()
         _, tools = openapi_tools.load(api_path, base=mock_url)
