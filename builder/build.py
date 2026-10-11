@@ -118,7 +118,9 @@ def main():
         out.mkdir(exist_ok=True)
         (out / f"{slot}.spec.json").write_text(json.dumps(spec, indent=1))
         (out / f"{slot}.workflow.json").write_text(json.dumps(wf, indent=1))
-        v = freya.validate_workflow(slot, wf)
+        # A dry run also checks that the name is free: under the slot's own name it fails with 409 once the slot's
+        # workflow exists, so every rebuild would stop here. A dry run creates nothing, so this name never exists.
+        v = freya.validate_workflow(f"{slot} dry run", wf)
         trace.event("dry_run", result=v)
         if a.dry:
             print(json.dumps({"slot": slot, "dry_run": v, "selftest": f"{ok}/{len(st)}", "warnings": len(warnings)}))
