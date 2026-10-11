@@ -1,15 +1,13 @@
 {
- "about": "Each service of the test data, the HTTP method and paths it answers on, and the request field names it reads. The paths are provisional until the bank's integration document (section 6) arrives.",
- "customer_fields": ["customerNo", "customerNumber", "customer_no", "musteriNo"],
- "card_fields": ["cardNumber", "card_number", "maskedCardNumber", "kartNo"],
- "week_fields": ["newStatementWeek", "statementWeek", "week", "hafta"],
+ "about": "The services of the service contract (2026-10-01): POST <base><service>, looked up as the test data's table says; not_found is the service's 404 from section 4 of the contract (a 400 INVALID_ARGUMENTS_ERROR where it has none). 'paths' are earlier provisional paths, still accepted.",
+ "base": "/voice/v1/",
  "services": {
-  "cards.list": {"method": "POST", "paths": ["/cards/list", "/cards.list"]},
-  "cards.balance": {"method": "POST", "paths": ["/cards/balance", "/cards.balance"]},
-  "statement.week.get": {"method": "POST", "paths": ["/statement/week/get", "/statement.week.get"]},
-  "statement.week.decide": {"method": "POST", "paths": ["/statement/week/decide", "/statement.week.decide"]},
-  "statement.week.change": {"method": "POST", "paths": ["/statement/week/change", "/statement.week.change"]},
-  "contact.email.get": {"method": "POST", "paths": ["/contact/email/get", "/contact.email.get"]},
-  "statement.pdf.send": {"method": "POST", "paths": ["/statement/pdf/send", "/statement.pdf.send"]}
+  "cards.list": {"lookup": "customer", "paths": ["/cards/list", "/cards.list"], "not_found": {"code": "FB_IVR_CHANNEL_102", "message": "Müşteriye ait geçerli kart bilgisi bulunamadı."}},
+  "cards.balance": {"lookup": "card", "paths": ["/cards/balance", "/cards.balance"], "not_found": {"code": "FB_IVR_CHANNEL_120", "message": "Kart bulunamadı."}},
+  "statement.week.get": {"lookup": "card", "paths": ["/statement/week/get", "/statement.week.get"], "not_found": {"code": "FB_IVR_CHANNEL_121", "message": "Kart bulunamadı."}},
+  "statement.week.decide": {"lookup": "card", "paths": ["/statement/week/decide", "/statement.week.decide"], "not_found_400_message": "no preview for this card and week"},
+  "statement.week.change": {"lookup": "card", "paths": ["/statement/week/change", "/statement.week.change"], "not_found_400_message": "no change for this card and week"},
+  "contact.email.get": {"lookup": "customer", "paths": ["/contact/email/get", "/contact.email.get"], "not_found_400_message": "customer not found"},
+  "statement.pdf.send": {"lookup": "customer", "paths": ["/statement/pdf/send", "/statement.pdf.send"], "not_found": {"code": "FB_IVR_CHANNEL_107", "message": "Pdf dokümanı bulunamadı"}}
  }
 }

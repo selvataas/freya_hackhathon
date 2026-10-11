@@ -1,77 +1,111 @@
-// The mock of the bank's services: for the bank's test customers it returns exactly the answers of the test data,
-// HTTP status included, after the delay the data gives. data/routes.json maps each service to its method, paths and
-// request field names; data/test-customers.json is the bank's test data. Every call is appended to the customer's
-// ledger (one Durable Object per customer): GET /ledger/<customerNo>. GET /health lists the services.
+// The mock of the bank's statement and debt services, as the service contract (2026-10-01) and the test data give
+// them. POST /voice/v1/<service> with the envelope {data, call}; for the bank's test customers it returns exactly the
+// answers of test-customers.json (status code and body) after the delay the data gives. Lookup as the test data's
+// table says: cards.list, contact.email.get and statement.pdf.send by data.customerNo; cards.balance and
+// statement.week.get by data.cardNumber (across all customers); statement.week.decide and .change by data.cardNumber,
+// then data.newStatementWeek. No entry: the service's 404 from the contract, or a 400 INVALID_ARGUMENTS_ERROR where
+// the service has no 404; a missing lookup field: 400. Fields at the top level of the body and the earlier provisional
+// paths are accepted too. An unfilled template ("{{...}}") gets a valid record. POST /oauth2/token answers a harmless
+// token. Every call is appended to the customer's ledger: GET /ledger/<customerNo>. GET /health lists the services.
 import routes from "../data/routes.json";
 import data from "../data/test-customers.json";
 
 const CUSTOMERS = Object.fromEntries(data.customers.map((c) => [String(c.customerNo), c]));
+const SERVICES = Object.keys(routes.services);
 const BY_PATH = {};
-for (const [svc, r] of Object.entries(routes.services)) for (const p of r.paths) BY_PATH[p.replace(/\/+$/, "")] = svc;
+for (const svc of SERVICES) {
+  for (const p of [routes.base + svc, ...(routes.services[svc].paths || [])]) BY_PATH[p.replace(/\/+$/, "")] = svc;
+}
 const SECRET = /authorization|cookie|key|token|secret/i;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const isTemplate = (v) => typeof v === "string" && v.includes("{{");
 
-function field(obj, names) {
-  for (const n of names) if (obj[n] !== undefined && obj[n] !== null && obj[n] !== "") return String(obj[n]);
-  const lower = Object.fromEntries(Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v]));
-  for (const n of names) if (lower[n.toLowerCase()] !== undefined && lower[n.toLowerCase()] !== "") return String(lower[n.toLowerCase()]);
+let n = 0;
+function result(code, message, type, http) {
+  n += 1;
+  const guid = (Date.now().toString(16) + n.toString(16)).padStart(32, "0").slice(-32);
+  return { http, response: { result: { guid, returnCode: code, messageText: message, code, message, type,
+    details: { guid, rootCause: http === 400 ? "InvalidArguments" : "NotFound", errorOrigin: "fides-mock" } } } };
+}
+const invalid = (msg) => result("INVALID_ARGUMENTS_ERROR", msg, "ERROR", 400);
+function notFound(svc) {
+  const nf = routes.services[svc].not_found;
+  return nf ? result(nf.code, nf.message, "WARNING", 404) : invalid(routes.services[svc].not_found_400_message || "record not found");
+}
+
+function field(body, name) {
+  const d = body && typeof body.data === "object" && body.data !== null ? body.data : {};
+  for (const src of [d, body || {}]) {
+    if (src[name] !== undefined && src[name] !== null && String(src[name]).trim() !== "") return String(src[name]).trim();
+  }
   return null;
 }
 
-// a card the request names: the masked number as cards.list gives it, another masking, or the last four digits
-function cardKey(keys, asked) {
-  if (!asked) return keys.length === 1 ? keys[0] : null;
-  if (keys.includes(asked)) return asked;
-  const digits = asked.replace(/\D/g, "");
-  const last4 = digits.slice(-4), first = digits.slice(0, 4);
-  const hits = keys.filter((k) => k.replace(/\D/g, "").slice(-4) === last4);
-  if (hits.length === 1) return hits[0];
-  const better = hits.filter((k) => k.replace(/\D/g, "").startsWith(first));
-  return better.length === 1 ? better[0] : null;
+// every card of the test data, for the services looked up by card: masked number -> {customer, node}
+const CARDS = {};
+for (const c of data.customers) {
+  for (const svc of ["cards.balance", "statement.week.get", "statement.week.decide", "statement.week.change"]) {
+    const node = c.services[svc];
+    if (node && node.http === undefined) for (const k of Object.keys(node)) (CARDS[k] ||= []).push(c);
+  }
+}
+const digits = (s) => String(s).replace(/\D/g, "");
+function cardKey(svc, asked) {
+  const owners = (k) => (CARDS[k] || []).filter((c) => c.services[svc] && c.services[svc][k]);
+  if (owners(asked).length) return asked;
+  // another masking of the same card (first 4 + last 4): match the visible digits, only when one card fits
+  const m = String(asked).match(/^(\d{4,6})\D+(\d{4})$/);
+  if (!m) return null;
+  const hits = Object.keys(CARDS).filter((k) => owners(k).length && digits(k).startsWith(m[1]) && digits(k).endsWith(m[2]));
+  return hits.length === 1 ? hits[0] : null;
 }
 
-const notFound = (msg) => ({ http: 404, response: { result: { returnCode: "MOCK_404", messageText: msg, code: "MOCK_404", message: msg, type: "WARNING" } } });
-
 function answer(svc, body) {
-  const no = field(body, routes.customer_fields);
-  const cust = no && CUSTOMERS[no];
-  if (!cust) return { cust: null, entry: notFound("Müşteri bulunamadı.") };
-  let node = cust.services[svc];
-  if (!node) return { cust, entry: notFound("Servis cevabı yok.") };
-  if (node.http === undefined) {                       // keyed by card
-    const k = cardKey(Object.keys(node), field(body, routes.card_fields));
-    if (!k) return { cust, entry: notFound("Kart bulunamadı.") };
-    node = node[k];
-    if (node.http === undefined) {                     // keyed by the requested week
-      const w = field(body, routes.week_fields);
-      const wk = w && Object.keys(node).find((x) => String(Number(x)) === String(Number(w)));
-      if (!wk) return { cust, entry: notFound("Hafta için cevap yok.") };
-      node = node[wk];
-    }
+  const by = routes.services[svc].lookup;   // "customer" or "card"
+  if (by === "customer") {
+    let no = field(body, "customerNo");
+    if (no === null) return { cust: null, entry: invalid("customer number cannot be empty") };
+    if (isTemplate(no)) no = String(data.customers[0].customerNo);
+    const cust = CUSTOMERS[String(Number(no)) === "NaN" ? no : String(Number(no))] || CUSTOMERS[no];
+    const node = cust && cust.services[svc];
+    return { cust, entry: node && node.http !== undefined ? node : notFound(svc) };
   }
-  return { cust, entry: node };
+  let card = field(body, "cardNumber");
+  if (card === null) return { cust: null, entry: invalid("card number cannot be empty") };
+  if (isTemplate(card)) card = Object.keys(CARDS).find((k) => CARDS[k].some((c) => c.services[svc] && c.services[svc][k])) || card;
+  const key = cardKey(svc, card);
+  if (!key) return { cust: null, entry: notFound(svc) };
+  const cust = CARDS[key].find((c) => c.services[svc] && c.services[svc][key]);
+  let node = cust.services[svc][key];
+  if (node.http === undefined) {                       // keyed by the requested week
+    let w = field(body, "newStatementWeek");
+    if (w === null) return { cust, entry: invalid("newStatementWeek cannot be empty") };
+    if (isTemplate(w)) w = Object.keys(node)[0];
+    const wk = Object.keys(node).find((x) => String(Number(x)) === String(Number(w)));
+    node = wk ? node[wk] : null;
+  }
+  return { cust, entry: node && node.http !== undefined ? node : notFound(svc) };
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "");
-    if (path === "/health") return json({ ok: true, services: Object.keys(routes.services), customers: data.customers.length });
+    if (path === "/health") return json({ ok: true, services: SERVICES, paths: SERVICES.map((s) => routes.base + s), customers: data.customers.length });
+    if (path === "/oauth2/token") return json({ access_token: "mock-token-not-checked", token_type: "Bearer", expires_in: 1800 });
     if (request.method === "GET" && path.startsWith("/ledger/")) {
       const id = decodeURIComponent(path.slice("/ledger/".length));
       return env.LEDGER.get(env.LEDGER.idFromName(id)).fetch("https://ledger/read");
     }
     const svc = BY_PATH[path];
-    if (!svc) return json({ result: { returnCode: "MOCK_404", messageText: "unknown path " + path } }, 404);
+    if (!svc) return json(invalid("unknown service " + path).response, 404);
     let body = {};
-    if (request.method === "GET") body = Object.fromEntries(url.searchParams);
-    else { try { body = await request.json(); } catch (e) { body = {}; } }
+    try { body = await request.json(); } catch (e) { body = {}; }
     const { cust, entry } = answer(svc, body);
-    const delay = Number(entry.delaySeconds ?? entry.gecikmeSaniye ?? 0);
+    const delay = Number(entry.delaySeconds ?? 0);
     if (delay > 0) await sleep(delay * 1000);
     const status = Number(entry.http) || 200;
-    const resp = entry.response ?? entry.yanit ?? {};
     if (cust) {
       const headers = {};
       for (const [k, v] of request.headers) if (!SECRET.test(k)) headers[k] = v;
@@ -81,7 +115,7 @@ export default {
           conversation: st ? "trace:" + st.split("-")[0] : null, headers }),
       });
     }
-    return json(resp, status);
+    return json(entry.response ?? {}, status);
   },
 };
 
