@@ -21,7 +21,11 @@ no manual step.
 4. **Self-test.** `selftest.py` makes scenarios from the spec and runs them through the brain with a fake bank, on many
    calendar days. No model and no platform call; it takes well under a second. The result goes into the trace.
 5. **Save.** The workflow is validated with a dry run and saved to its slot with `freya.save_workflow` (created the first
-   time, updated and published afterwards).
+   time, updated and published afterwards). `platform_calls.py` tries these calls again on a platform failure (503,
+   504, no connection): after 1.5 minutes, then every 5 minutes, never past 25 minutes after the build started; a 4xx
+   stops at once, and every try is in the trace. Before a first create it looks for a workflow of the slot in the
+   workspace and takes it over, so a create that failed but went through never leaves a second workflow.
+   `python3 builder/platform_calls.py export <slot> <path>` exports with the same retry.
 
 The builder contains no value, rule or name from any brief. It only knows its own vocabularies (situations, date words).
 
@@ -62,6 +66,7 @@ Options:
 | `FREYA_BANK_TEAM_KEY` | the practice bank (only for `--test` and `tools/run_cases.py`) |
 | `ANTHROPIC_API_KEY` | the model calls of the spec extraction |
 | `LLM_MODEL` | optional: the builder's model, default `claude-opus-5-5` |
+| `PLATFORM_RETRY_WAITS` | tests only: the waits between platform tries in seconds, default `90,300,300,300` |
 
 The phone agent always runs on `freya.AGENT_LLM`; the builder never sets a model on the workflow.
 
@@ -85,6 +90,7 @@ anything is written.
 python3 builder/sim_local.py out/<slot>.spec.json [case ...] [-v] [--cases file.json]   # scripted customers, fake bank
 python3 builder/selftest.py out/<slot>.spec.json                                       # spec-made scenarios, many days
 python3 tests/test_runtime_fixes.py                                                    # corrections, numbers in parts, callback times, lines
+python3 tests/test_platform_retry.py                                                   # platform outages, against a fake API
 python3 tools/run_cases.py <agent_id> --brief A [--reps 3] [--cases tests/realistic-cases.json]   # the platform
 ```
 

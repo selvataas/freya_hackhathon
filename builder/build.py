@@ -13,7 +13,7 @@ ROOT = HERE.parent
 
 sys.path.insert(0, str(HERE)); sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "tools"))
 import freya
-import ask_client, openapi_tools, render, selftest
+import ask_client, openapi_tools, platform_calls, render, selftest
 from extract import extract, check_verbatim, MODEL, EFFORT
 from spec_schema import normalize
 from trace import Trace
@@ -123,7 +123,8 @@ def main():
         (out / f"{slot}.workflow.json").write_text(json.dumps(wf, indent=1))
         # A dry run also checks that the name is free: under the slot's own name it fails with 409 once the slot's
         # workflow exists, so every rebuild would stop here. A dry run creates nothing, so this name never exists.
-        v = freya.validate_workflow(f"{slot} dry run", wf)
+        platform_calls.start(trace.t0)
+        v = platform_calls.attempt(trace, "dry run", lambda: freya.validate_workflow(f"{slot} dry run", wf))
         trace.event("dry_run", result=v)
         if a.dry:
             print(json.dumps({"slot": slot, "dry_run": v, "selftest": f"{ok}/{len(st)}", "warnings": len(warnings)}))
@@ -132,7 +133,7 @@ def main():
         known = (json.loads(state_file.read_text()) if state_file.exists() else {}).get(slot)
         if known:
             rename(known["workflow_id"], slot, wf, trace)
-        ids = freya.save_workflow(slot, wf, state_file=str(state_file))
+        ids = platform_calls.save(trace, slot, wf, state_file)
         if not known:
             rename(ids["workflow_id"], slot, wf, trace)
         trace.event("saved", slot=slot, name=slot, **ids)

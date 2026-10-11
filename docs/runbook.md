@@ -205,7 +205,7 @@ of the run whose trace we submit:
 N=1; SLOT=hidden-$N       # N=2 for the second final brief
 # run the build, then export at once
 python3 builder/build.py --no-cache briefs/hidden-$N.md briefs/hidden-$N.openapi.json 2>&1 | tee traces/hidden-$N.log
-python3 -c "import freya,json,sys; s=json.load(open('.freya-agents.json'))[sys.argv[1]]; print(freya.export_workflow(s['workflow_id'], sys.argv[2]))" $SLOT submission/hidden-$N.workflow.json
+python3 builder/platform_calls.py export $SLOT submission/hidden-$N.workflow.json   # retried on 503/504; the tries go into the build's trace
 T="$(ls -t traces/2*-$SLOT.jsonl | head -1)"
 cp "$T" traces/hidden-$N.jsonl
 cat "$T" >> traces/hidden-$N.log          # the official trace: console output, then the whole trace
@@ -309,24 +309,31 @@ and without touching the workflow on Freya.
 
 ## 5a. The platform is down in the evening
 
-What the builder does when the platform answers 503 or 504, or not at all (tested on 11 October against a fake API):
+What the builder does when the platform answers 503 or 504, or not at all (`tests/test_platform_retry.py` runs each
+case against a fake API):
 
-- It has **no retry**. The first failed platform call stops the build with a traceback and exit code 1.
+- **It tries again**, for the dry run, the save (a first create, or the update and publish of a slot that exists) and
+  the export (`builder/platform_calls.py export`): the second try 1.5 minutes after the first, then every 5 minutes,
+  five tries at most, and no try waits past 25 minutes after the build started, so a brief stays under 30 minutes.
+  Only 503, 504 and a missing connection or answer are tried again; any other answer (a 4xx) stops at once. Every try
+  is a `platform_call` event in the trace. **Do not stop a build that is waiting**: the console shows nothing while
+  it waits; the trace shows the tries.
+- A first create that answered with an error may still have gone through. Before every create the builder looks for
+  a workflow of the slot in the workspace (named `hidden-N` or `hidden-N <date-time>`); if there is one, it takes it
+  over (`platform_adopted` in the trace), writes it to `.freya-agents.json`, and updates and publishes it. A second
+  workflow is never made.
 - Everything before the first platform call is done and kept: the model calls, the spec cache, the self-test,
-  `out/<slot>.spec.json`, `out/<slot>.workflow.json` and the trace. The trace is written line by line and ends with
-  `error` (the platform's answer) and `end`.
-- The first platform call is the dry run. When it fails, nothing changed on the platform and `.freya-agents.json` is
-  as it was.
-- When the dry run passes and the save fails:
-  - First build of a slot (no `hidden-N` in `.freya-agents.json`): the create may have gone through although it
-    answered 504. Then the workspace has a workflow `hidden-N <date-time>` that `.freya-agents.json` does not know.
-  - A slot that exists: a PUT that went through leaves a new, unpublished version; the published version is still the
-    old one, and `.freya-agents.json` keeps the old version number.
+  `out/<slot>.spec.json`, `out/<slot>.workflow.json` and the trace, which is written line by line.
+- When the tries run out, the build stops with a traceback and exit code 1; the trace ends with `platform_call ...
+  gave up`, `error` and `end`. If it stopped at the dry run, nothing changed on the platform. If it stopped while
+  updating a slot that exists, a PUT that went through may have left a new, unpublished version; the published
+  version is still the old one, and `.freya-agents.json` keeps the old version number.
 
 What to do:
 
-1. Build as in section 4, with `--no-cache`. The build does not need the platform until its last steps.
-2. **Keep the local outputs in any case**, also when the build stopped at the dry run or the save. `out/` and the
+1. Build as in section 4, with `--no-cache`. The build does not need the platform until its last steps, and it
+   waits out a short outage by itself.
+2. **Keep the local outputs in any case**, also when the build gave up at the dry run or the save. `out/` and the
    builder's traces are not committed, so copy them under names that say they are local, then commit and push:
 
 ```bash
@@ -348,9 +355,7 @@ git commit -m "Local build output of $SLOT while the platform is down" && git pu
    repository as the record of the earlier run. Building again, and not publishing the earlier file, keeps the rules:
    the submitted workflow is the output of the run whose trace we submit, that run reads the brief itself, and no
    workflow is saved by hand. It costs another $0.50 to $0.80 and 2 to 3 minutes per brief.
-   - Before that build, if the failed run reached the save of a first build: look in the Freya dashboard for a
-     workflow `hidden-N <date-time>` that `.freya-agents.json` does not know. If there is one, delete it (it is not
-     submitted), so the workspace keeps one workflow per slot.
+   - A workflow left by a create that answered with an error needs nothing: the new build takes it over.
    - An unpublished version left by a failed update needs nothing: the new build saves and publishes a newer one.
 5. **If the platform has not answered by 22:00 Istanbul (19:00 UTC)**, write to the organisers (the address in the
    kit email): team Fides; the briefs affected; since when the platform answers 503/504 (the `error` line of the
