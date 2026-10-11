@@ -351,6 +351,121 @@ def neutral_phrases(spec):
     return s, changes
 
 
+# ---------------------------------------------------------------- lines written as instructions to the agent
+
+# who an instruction to the agent may name as the one it speaks to
+WHO = r"(?:the\s+(?:customer|caller|client|person|debtor|borrower|cardholder|account\s+holder|relative)|them)"
+_AGENT_YOU = ((r"\byou\s+are\b", "I am"), (r"\byou\s+were\b", "I was"), (r"\byourself\b", "myself"), (r"\byours\b", "mine"),
+              (r"\byour\b", "my"),
+              (r"\byou(?=\s+(?:can|cannot|can't|could|couldn't|will|won't|would|wouldn't|shall|should|must|may|might|need|have|had|"
+               r"do|don't|did|didn't|want|call|will|work|offer|record|take|understand|see|help)\b)", "I"),
+              (r"(?:^|(?<=\bthat\s)|(?<=\bwhether\s)|(?<=\bif\s))you\b", "I"), (r"\byou\b", "me"))
+_THEM_YOU = ((r"they're", "you're"), (r"they\s+are", "you are"), (r"they\s+were", "you were"), (r"theirs", "yours"),
+             (r"their", "your"), (r"themselves|themself", "yourself"), (r"they", "you"), (r"them", "you"))
+
+
+def _to_listener(text, who):
+    """A clause about the listener, said to the listener: 'their date of birth' -> 'your date of birth'. The agent's own
+    'you' becomes 'I' or 'me' first. who: the noun the instruction named for the listener ('the customer'), or None."""
+    t = text
+    for a, b in _AGENT_YOU:
+        t = re.sub(a, "\x01" + b, t, flags=re.I)
+    if who and who.lower().startswith("the "):
+        n = re.escape(who).replace(r"\ ", r"\s+")
+        for a, b in ((r"'s\b", "your"), (r"\s+is\b", "you are"), (r"\s+was\b", "you were"), (r"\s+has\b", "you have"),
+                     (r"\s+does\b", "you do"), (r"\b", "you")):
+            t = re.sub(r"\b" + n + a, b, t, flags=re.I)
+    for a, b in _THEM_YOU:
+        t = re.sub(r"\b(?:" + a + r")\b", b, t, flags=re.I)
+    return t.replace("\x01", "").strip(" ,")
+
+
+def _cap(t):
+    return t[:1].upper() + t[1:]
+
+
+def _instruction_to_line(sentence):
+    """One sentence written as an instruction to the agent, as the agent says it to the listener. None when the sentence
+    is not such an instruction or cannot be turned."""
+    s = sentence.strip()
+    body = re.sub(r"[.!?]+$", "", s).strip()
+    m = re.match(r"(?i)^(?:please\s+)?(?:say|reply|answer|respond|tell\s+" + WHO + r")\b[^\"“]*?[\"“](.+?)[\"”]\s*$", body)
+    if m:
+        return m.group(1).strip()
+    m = re.match(r"(?i)^(?:please\s+)?ask\s+(?:(" + WHO + r")\s+)?(.+)$", body)
+    if m and not re.match(r"(?i)^(?:us|me|our)\b", m.group(2)):
+        who, rest = m.group(1), m.group(2).strip()
+        r = re.match(r"(?i)^to\s+(.+)$", rest)
+        if r:
+            return "Could you " + _to_listener(r.group(1), who) + "?"
+        r = re.match(r"(?i)^for\s+(.+)$", rest)
+        if r:
+            return "Could you give me " + _to_listener(r.group(1), who) + "?"
+        r = re.match(r"(?i)^(whether|if|what|when|which|how|where|who|why)\b\s*(.*)$", rest)
+        if r:
+            return "Could you tell me " + r.group(1).lower() + " " + _to_listener(r.group(2), who) + "?"
+        return None
+    m = re.match(r"(?i)^(?:please\s+)?offer\s+(?:(" + WHO + r")\s+)?to\s+(.+)$", body)
+    if m:
+        return "Would you like me to " + _to_listener(m.group(2), m.group(1)) + "?"
+    m = re.match(r"(?i)^(?:please\s+)?(?:tell|inform|remind|advise|notify)\s+(" + WHO + r")\s+(?:that\s+)?(.+)$", body)
+    if m:
+        r = re.match(r"(?i)^to\s+(.+)$", m.group(2))
+        if r:
+            return "Please " + _to_listener(r.group(1), m.group(1)) + "."
+        return _cap(_to_listener(m.group(2), m.group(1))) + "."
+    m = re.match(r"(?i)^(?:please\s+)?let\s+(" + WHO + r")\s+know\s+(?:that\s+)?(.+)$", body)
+    if m:
+        return _cap(_to_listener(m.group(2), m.group(1))) + "."
+    m = re.match(r"(?i)^(?:please\s+)?(?:explain|say|mention|state|confirm|clarify|stress|point\s+out)\s+(?:to\s+(" + WHO + r")\s+)?that\s+(.+)$", body)
+    if m:
+        return _cap(_to_listener(m.group(2), m.group(1))) + "."
+    return None
+
+
+def instruction_to_line(text):
+    """A spec line written as an instruction to the agent ('Ask the customer to say the month as a word.'), as the
+    agent says it ('Could you say the month as a word?'). None when no sentence of it is such an instruction."""
+    out, changed = [], False
+    for s in re.split(r"(?<=[.!?])\s+", (text or "").strip()):
+        new = _instruction_to_line(s) if s else None
+        out.append(new if new else s)
+        changed = changed or bool(new)
+    return " ".join(x for x in out if x) if changed else None
+
+
+def customer_lines(spec):
+    """Lines of the spec that the agent says, written as instructions to the agent, become lines for the customer.
+    Lines marked verbatim are never touched. Returns (spec, changes)."""
+    import copy
+    s = copy.deepcopy(spec)
+    changes = []
+
+    def fix(where, holder, key, verbatim=False):
+        t = holder.get(key)
+        if verbatim or not isinstance(t, str) or not t.strip():
+            return
+        new = instruction_to_line(t)
+        if new and new != t:
+            holder[key] = new
+            changes.append({"field": where, "from": t, "to": new})
+    for k, p in (s.get("phrases") or {}).items():
+        if isinstance(p, dict):
+            fix("phrases." + k, p, "text", p.get("verbatim"))
+    idn = s.get("identity") or {}
+    for i, q in enumerate(idn.get("questions") or []):
+        if isinstance(q, dict):
+            fix(f"identity.questions[{i}].ask_text", q, "ask_text")
+    for i, h in enumerate(idn.get("hints") or []):
+        if isinstance(h, dict):
+            fix(f"identity.hints[{i}].instruction", h, "instruction")
+    for i, c in enumerate(s.get("custom_situations") or []):
+        if isinstance(c, dict):
+            fix(f"custom_situations[{i}].say_text", c, "say_text", c.get("verbatim"))
+            fix(f"custom_situations[{i}].callback_ask_text", c, "callback_ask_text")
+    return s, changes
+
+
 def render(spec, tools):
     nodes = {}
     used = [t for t in ("verify_identity", "get_account", "create_promise", "add_note", "schedule_callback", "transfer_to_agent") if t in tools]

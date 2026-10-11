@@ -16,7 +16,8 @@ no manual step.
    (`runtime.py`, the "brain") makes every decision: dates, holidays, business days, deadlines, amounts, attempts, the
    outcome. The bank's tools are called by the engine with values the code sets, never by the model; `close_call` runs at
    the end of the call with the outcome the code computed. The dialogue model only says lines the code built from the
-   spec's phrases.
+   spec's phrases. A spec line written as an instruction to the agent ("Ask the customer to ...") is turned into a line
+   for the customer first; lines marked verbatim are never touched.
 4. **Self-test.** `selftest.py` makes scenarios from the spec and runs them through the brain with a fake bank, on many
    calendar days. No model and no platform call; it takes well under a second. The result goes into the trace.
 5. **Save.** The workflow is validated with a dry run and saved to its slot with `freya.save_workflow` (created the first
@@ -74,7 +75,7 @@ extraction; `--no-llm` guarantees no model call.
 
 Every run writes `traces/<time>-<slot>.jsonl`, one JSON object per line: `start` (with `git_commit`, the commit the
 builder runs from, `git_dirty`, whether tracked files had uncommitted changes, and the untracked files), the tools, every `model_call` (model,
-purpose, tokens, seconds), the spec comparison, warnings, `rendered` (number of steps and tools), `selftest`,
+purpose, tokens, seconds), the spec comparison, warnings, `lines_for_customer`, `rendered` (number of steps and tools), `selftest`,
 `dry_run`, `saved` (workflow and agent id), and `end` (build seconds). API keys and the team key are masked before
 anything is written.
 
@@ -83,6 +84,7 @@ anything is written.
 ```bash
 python3 builder/sim_local.py out/<slot>.spec.json [case ...] [-v] [--cases file.json]   # scripted customers, fake bank
 python3 builder/selftest.py out/<slot>.spec.json                                       # spec-made scenarios, many days
+python3 tests/test_runtime_fixes.py                                                    # corrections, numbers in parts, callback times, lines
 python3 tools/run_cases.py <agent_id> --brief A [--reps 3] [--cases tests/realistic-cases.json]   # the platform
 ```
 

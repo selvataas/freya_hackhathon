@@ -341,13 +341,30 @@ def find_month(t):
     return None
 
 
+# "the 21st, sorry, I mean the 20th": words that start a correction of what was just said
+CORRECTION = re.compile(r"\b(?:sorry|i mean|i meant|actually|no wait|rather|correction)\b", re.I)
+
+
+def corrected(text, parse):
+    """What a message names, after its corrections. parse(part) returns a dict of what one part names; later parts
+    replace only what they name: 'tomorrow at 11, sorry, I mean 12' keeps tomorrow and takes 12."""
+    parts = CORRECTION.split(text or "")
+    if len(parts) == 1:
+        parts = [text or ""]
+    out = {}
+    for part in parts:
+        if part.strip(" ,.;:!?-"):
+            out.update((k, v) for k, v in (parse(part) or {}).items() if v not in (None, ""))
+    return out
+
+
 def parse_day_phrase(S, text, today):
     """A day the customer names, relative to today. Returns (date or None, 'date'|'vague'|'none')."""
     t = (text or "").lower().strip()
     if not t:
         return None, "none"
     # "the 21st, sorry, I mean the 20th": the part after the last correction counts
-    parts = re.split(r"\b(?:sorry|i mean|i meant|actually|no wait|rather|correction)\b", t)
+    parts = CORRECTION.split(t)
     if len(parts) > 1 and parts[-1].strip(" ,.!?"):
         t = parts[-1]
     t = re.sub(r"[,.!?]", " ", t)
@@ -496,17 +513,42 @@ def parse_year_words(t):
 
 
 def parse_dob(text, order):
-    """Returns ('ok', 'YYYY-MM-DD') or ('partial', None) or ('bad', None)."""
+    """Returns ('ok', 'YYYY-MM-DD') or ('partial', None) or ('bad', None). After a correction ('the 18th, sorry,
+    I mean the 19th of October 1983') the corrected parts replace the ones said before."""
     t = (text or "").lower().strip()
     if not t:
         return "partial", None
+    got, bad = {}, False
+    parts = CORRECTION.split(t)
+    for part in (parts if len(parts) > 1 else [t]):
+        p = dob_parts(part, order)
+        if p is None:
+            bad = True  # a date that cannot exist: bad, unless a later part corrects it
+            continue
+        if p:
+            bad = False
+            got.update(p)
+    if bad or not got:
+        return "bad", None
+    if "y" in got and "m" in got and "d" in got:
+        try:
+            return "ok", D(got["y"], got["m"], got["d"]).isoformat()
+        except Exception:
+            return "bad", None
+    return "partial", None
+
+
+def dob_parts(t, order):
+    """The parts of a date of birth that one stretch of words names: some of 'y', 'm' and 'd'. None for a date
+    given in full that cannot exist."""
     t2 = re.sub(r"[,]", " ", t)
     m = re.search(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b", t2)
     if m:
         try:
-            return "ok", D(int(m.group(1)), int(m.group(2)), int(m.group(3))).isoformat()
+            x = D(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            return {"y": x.year, "m": x.month, "d": x.day}
         except Exception:
-            return "bad", None
+            return None
     m = re.search(r"\b(\d{1,4})[/.\- ](\d{1,2})[/.\- ](\d{2,4})\b", t2)
     if m:
         a, b, c = int(m.group(1)), int(m.group(2)), int(m.group(3))
@@ -519,9 +561,10 @@ def parse_dob(text, order):
         if y < 100:
             y += 1900 if y > 30 else 2000
         try:
-            return "ok", D(y, mo, d).isoformat()
+            x = D(y, mo, d)
+            return {"y": x.year, "m": x.month, "d": x.day}
         except Exception:
-            return "bad", None
+            return None
     t2 = t2.replace("-", " ")
     mon = find_month(t2)
     year = parse_year_words(t2)
@@ -531,20 +574,20 @@ def parse_dob(text, order):
         # strip the year words so that "nineteen eighty-eight" does not look like a day
         t3 = re.sub(r"\b(nineteen|twenty|two thousand)(\s+(and\s+)?[a-z]+){0,2}\s*$", " ", t3)
     days = day_numbers(t3, cardinals=True)
-    if mon and days and year:
-        try:
-            return "ok", D(year, mon, days[0]).isoformat()
-        except Exception:
-            return "bad", None
-    if mon or days or year:
-        return "partial", None
-    return "bad", None
+    out = {}
+    if year:
+        out["y"] = year
+    if mon:
+        out["m"] = mon
+    if days:
+        out["d"] = days[0]
+    return out
 
 
 def parse_time(text):
-    """'around eleven', '11', '2 pm', 'half past ten', '14:30' -> 'HH:MM' or ''."""
+    """'around eleven', '11', '2 pm', 'half past ten', '14:30', 'tonight after nine' -> 'HH:MM' or ''."""
     t = (text or "").lower().replace(".", ":")
-    pm = bool(re.search(r"\b(pm|p m|afternoon|evening)\b", t))
+    pm = bool(re.search(r"\b(pm|p m|afternoon|evening|tonight|night)\b", t))
     am = bool(re.search(r"\b(am|a m|morning)\b", t))
     m = re.search(r"\b(\d{1,2}):(\d{2})\b", t)
     h, mi = None, 0
@@ -575,6 +618,31 @@ def parse_time(text):
     if h > 23 or mi > 59:
         return ""
     return "%02d:%02d" % (h, mi)
+
+
+# a number said as a time, and the words that name a day
+TIME_WORDS = re.compile(r"\b\d{1,2}[:.]\d{2}\b|\b\d{1,2}\s*(?:am|pm|a\s?m|p\s?m|o'?clock)\b"
+                        r"|\b(?:at|around|about|after|before|by|from|until|till)\s+\d{1,2}\b", re.I)
+DAY_WORDS = re.compile(r"\b(?:today|tonight|tomorrow|now|" + "|".join(WEEKDAYS + MONTHS + list(ORD)) + r")\b"
+                       r"|\b\d{1,2}(?:st|nd|rd|th)\b|\b\d{1,2}[/.]\d{1,2}\b|\b\d{4}-\d{2}-\d{2}\b", re.I)
+
+
+def callback_when(S, text, today):
+    """The day and the time a callback phrase names. A number said as the time is not a day ('at 3 pm' is not the
+    3rd), and a correction replaces only what it names ('tomorrow at 11, sorry, I mean 12'). Returns (date or None, 'HH:MM' or '')."""
+    def part(t):
+        tm = parse_time(t)
+        d = None
+        if not tm or DAY_WORDS.search(t):
+            d = parse_day_phrase(S, TIME_WORDS.sub(" ", t) if tm else t, today)[0]
+        return {"d": d, "tm": tm}
+    got = corrected(text, part)
+    return got.get("d"), got.get("tm") or ""
+
+
+def spoken_amount(text):
+    """An amount as said; after a correction ('two hundred, sorry, I mean two hundred and fifty') the corrected one."""
+    return corrected(text, lambda t: {"a": to_float(t)}).get("a")
 
 
 # ---------------------------------------------------------------- spec lookups
@@ -865,8 +933,7 @@ def on_custom_callback(S, V, st, now):
     consume(V, ("presence", "cb_phrase", "q_kind"))
     tp = S.get("third_party") or {}
     today = now.date()
-    d, _ = parse_day_phrase(S, text, today)
-    tm = parse_time(text)
+    d, tm = callback_when(S, text, today)
     if d is not None or tm:
         d = d or (D.fromisoformat(st["cb_day"]) if st.get("cb_day") else today)
         st["cb_day"] = d.isoformat()
@@ -976,8 +1043,7 @@ def on_third_party(S, V, st, now):
     today = now.date()
     if st.get("cb_frag"):
         text = join(st.pop("cb_frag"), text)
-    d, _ = parse_day_phrase(S, text, today)
-    tm = parse_time(text)
+    d, tm = callback_when(S, text, today)
     if st.get("_cut") and not (d is not None and tm):
         st["cb_frag"] = text
         if go_on(V, st, "talk_pre"):
@@ -993,8 +1059,9 @@ def on_third_party(S, V, st, now):
     if d is None:
         d = st.get("cb_day") and D.fromisoformat(st["cb_day"]) or today
     st["cb_day"] = d.isoformat()
-    if not tm:
+    if not tm and d in allowed_callback_days(S, now):
         return ask(V, st, "talk_pre", privacy, phrase(S, "ask_callback_time", date=fmt_date(d, today), address=who))
+    # a day outside the callback days needs no time: it is outside the window, and another time is asked once
     if callback_ok(S, d, tm, now):
         st["cb"] = [d.isoformat(), tm]
         return call_tool(S, V, st, "schedule_callback", {"date": d.isoformat(), "time": tm})
@@ -1115,17 +1182,25 @@ def normalize_answer(q, raw, iso_hint):
         return status if raw else "empty", None
     if typ == "digits":
         n = int(q.get("digits_length") or 0)
-        dg = words_to_digits(raw)
+        dg = corrected(raw, lambda t: {"dg": words_to_digits(t)}).get("dg") or ""
         if not dg:
             return ("partial" if raw else "empty"), None
         if n and len(dg) < n:
             return "partial", None
         return "ok", dg[-n:] if n else dg
     if typ == "year":
-        y = parse_year_words(raw)
+        y = corrected(raw, lambda t: {"y": parse_year_words(t)}).get("y")
         return ("ok", str(y)) if y else (("partial" if raw else "empty"), None)
-    v = raw.strip()
+    v = corrected(raw, lambda t: {"v": t.strip(" ,;:")}).get("v") or ""
     return ("ok", v) if v else ("empty", None)
+
+
+def restarts(q, partial, raw):
+    """'44', then '440': the customer said the number again from the start. '463', then '51' is its second part."""
+    if (q.get("answer_type") or "") != "digits":
+        return False
+    a, b = words_to_digits(partial), words_to_digits(raw)
+    return bool(a) and len(b) > len(a) and b.startswith(a)
 
 
 def on_identity_turn(S, V, st):
@@ -1183,8 +1258,13 @@ def on_identity_turn(S, V, st):
     if rk == "question" and not raw and not iso:
         ans = (phrase(S, "purpose_answer") or phrase(S, "no_info")) if q == "purpose" or not q else (answer_for_question(S, q) or phrase(S, "no_info"))
         return ask_question(S, V, st, ans)
-    joined = join(st.get("id_partial") or "", raw)
+    partial = st.get("id_partial") or ""
+    if partial and restarts(qs[i], partial, raw):
+        partial = ""  # the number said again from the start: not a second part to add
+    joined = join(partial, raw)
     status, val = normalize_answer(qs[i], joined, iso)
+    if status == "ok" and st.get("_cut") and qs[i].get("answer_type") == "digits" and not qs[i].get("digits_length"):
+        status = "partial"  # a number of no fixed length that broke off: wait for the rest before sending it
     if status == "ok":
         st["id_partial"] = ""
         st["id_last"] = val
@@ -1479,7 +1559,7 @@ def on_main_turn(S, V, st, now):
     reply = sval(V, "reply")
     dphrase = sval(V, "date_phrase")
     V["_amount_raw"] = sval(V, "amount")
-    amount = to_float(sval(V, "amount"))
+    amount = spoken_amount(sval(V, "amount"))
     allp = sval(V, "applies_to_all")
     q = sval(V, "q_kind")
     consume(V, ("reply", "date_phrase", "amount", "applies_to_all", "q_kind"))
@@ -1494,10 +1574,10 @@ def on_main_turn(S, V, st, now):
         reply = frag_r  # the cut-off message said yes or no before the date words broke off
     raw_amount = sval(V, "_amount_raw")
     if frag_a and amount is not None:
-        a2 = to_float(join(frag_a, raw_amount))
+        a2 = spoken_amount(join(frag_a, raw_amount))
         amount = a2 if a2 is not None else amount
     elif frag_a and amount is None:
-        amount = to_float(frag_a)
+        amount = spoken_amount(frag_a)
     stage = st.get("stage") or "ask_today"
     prods = st.get("products") or []
     multi = len(prods) > 1

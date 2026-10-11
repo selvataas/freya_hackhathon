@@ -1651,5 +1651,767 @@
     }
    ]
   }
+ },
+ {
+  "id": "GA-20",
+  "spec": "brief-a",
+  "title": "a day outside the callback days, without a time: another time is asked once, then no callback",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "Saturday morning"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "Saturday morning"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "no_callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-21",
+  "spec": "brief-a",
+  "title": "a day outside the callback days without a time, then a time inside the window",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "Saturday morning"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "tomorrow at 11"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-10-15",
+     "time": "11:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-22",
+  "spec": "brief-a",
+  "title": "a time with no day word is not a day of the month ('at 3 pm' is today, not the 3rd)",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "she is back at 3 pm"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-10-14",
+     "time": "15:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-23",
+  "spec": "brief-a",
+  "title": "a callback day inside the window without a time: the time is asked",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "tomorrow"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "around eleven"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-10-15",
+     "time": "11:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-24",
+  "spec": "brief-a",
+  "title": "phone digits said again from the start ('44', then '447', then '4471'): no wrong answer",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "44",
+    "message_state": "cut_off"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "447",
+    "message_state": "cut_off"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [],
+   "wrong_answers": 0
+  }
+ },
+ {
+  "id": "GA-25",
+  "spec": "brief-a",
+  "title": "phone digits in two parts ('44', then '71') are joined",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "44",
+    "message_state": "cut_off"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "71"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [],
+   "wrong_answers": 0
+  }
+ },
+ {
+  "id": "GA-26",
+  "spec": "brief-a",
+  "title": "date of birth: the day corrected ('the eighteenth, sorry, I mean the fourteenth of March 1988')",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "the eighteenth, sorry, I mean the fourteenth of March nineteen eighty-eight"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [],
+   "wrong_answers": 0
+  }
+ },
+ {
+  "id": "GA-27",
+  "spec": "brief-a",
+  "title": "date of birth: only the month corrected after a full date ('14 May 1988, sorry, I mean March')",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 May 1988, sorry, I mean March"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [],
+   "wrong_answers": 0
+  }
+ },
+ {
+  "id": "GA-28",
+  "spec": "brief-a",
+  "title": "phone digits corrected ('4417, sorry, I mean 4471')",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4417, sorry, I mean 4471"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [],
+   "wrong_answers": 0
+  }
+ },
+ {
+  "id": "GA-29",
+  "spec": "brief-a",
+  "title": "callback time corrected ('tomorrow at 11, sorry, I mean 12'): tomorrow stays",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "tomorrow at 11, sorry, I mean 12"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-10-15",
+     "time": "12:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-30",
+  "spec": "brief-a",
+  "title": "callback day corrected ('tomorrow at 3 pm, no wait, today at 3 pm')",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "tomorrow at 3 pm, no wait, today at 3 pm"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-10-14",
+     "time": "15:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-31",
+  "spec": "brief-a",
+  "title": "amount corrected ('two hundred, sorry, I mean two hundred and fifty')",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "propose",
+    "amount": "two hundred, sorry, I mean two hundred and fifty",
+    "date_phrase": "Friday"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 250.0,
+     "date": "2026-10-16"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [],
+   "wrong_answers": 0
+  }
+ },
+ {
+  "id": "GN-01",
+  "spec": "nordwind",
+  "title": "a year corrected ('nineteen seventy-nine, sorry, I mean nineteen eighty')",
+  "variables": {
+   "given_name": "Ana",
+   "surname": "Lind",
+   "salutation": "Mrs",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "N4 7QX",
+   "birth_year": "1980"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "card",
+    "last_digits": "1234",
+    "overdue_amount": 300.0,
+    "days_overdue": 6,
+    "min_due": 90.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "N4 7QX"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "nineteen seventy-nine, sorry, I mean nineteen eighty"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "next Tuesday"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "committed",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "a1",
+     "amount": 300.0,
+     "date": "2026-11-10"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [],
+   "wrong_answers": 0
+  }
+ },
+ {
+  "id": "GN-02",
+  "spec": "nordwind",
+  "title": "a text answer corrected ('N4 7QY, sorry, I mean N4 7QX')",
+  "variables": {
+   "given_name": "Ana",
+   "surname": "Lind",
+   "salutation": "Mrs",
+   "call_time": "2026-11-04T09:30"
+  },
+  "identity": {
+   "postcode": "N4 7QX",
+   "birth_year": "1980"
+  },
+  "products": [
+   {
+    "id": "a1",
+    "kind": "card",
+    "last_digits": "1234",
+    "overdue_amount": 300.0,
+    "days_overdue": 6,
+    "min_due": 90.0
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "N4 7QY, sorry, I mean N4 7QX"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "nineteen eighty"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "next Tuesday"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "committed",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "a1",
+     "amount": 300.0,
+     "date": "2026-11-10"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [],
+   "wrong_answers": 0
+  }
  }
 ]

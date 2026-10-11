@@ -99,6 +99,9 @@ def main():
         spec, neutral = render.neutral_phrases(spec)
         if neutral:
             trace.event("phrases_neutralized", about="success words removed from non-verbatim lines said before any result", changes=neutral)
+        spec, lines = render.customer_lines(spec)
+        if lines:
+            trace.event("lines_for_customer", about="lines written as instructions to the agent, turned into lines for the customer", changes=lines)
         wf = render.render(spec, tools)
         kinds = {}
         for n in wf["nodes"].values():

@@ -10,7 +10,7 @@ import copy, json, pathlib, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import runtime
+import render, runtime
 
 try:
     CASES = {c["id"]: c for c in json.load(open(HERE.parent / "public-test-set.json"))}
@@ -328,6 +328,8 @@ def compare(bank, exp):
         problems.append(f"callbacks {bank.callbacks} expected {exp['callbacks']}")
     if sorted(bank.transfers) != sorted(t["queue"] for t in exp["transfers"]):
         problems.append(f"transfers {bank.transfers} expected {exp['transfers']}")
+    if "wrong_answers" in exp and bank.wrong != exp["wrong_answers"]:
+        problems.append(f"{bank.wrong} wrong security answers, expected {exp['wrong_answers']}")
     return problems
 
 
@@ -377,6 +379,10 @@ def run_case(spec, cid, verbose=False):
                 head = o.split("<")[0].strip()
                 if len(head) > 6 and x.startswith(head) and y.startswith(head):
                     problems.append(f"same opening twice in a row: '{head}'")
+    # a line the agent says is never an instruction to the agent ('Ask the customer to ...')
+    for who, text in log:
+        if who == "AGENT" and not text.startswith("[llm]") and render.instruction_to_line(text.replace("[bye] ", "")):
+            problems.append(f"a line written as an instruction to the agent: {text[:80]}")
     if cid in ("R-07z",) and not (log and log[-1][1].startswith("[bye]")):
         problems.append("the call did not end with the agent's own goodbye")
     if cid.startswith("R-short") and any(who == "AGENT" and text.strip() in runtime.VARIANTS["go_on"] for who, text in log):
