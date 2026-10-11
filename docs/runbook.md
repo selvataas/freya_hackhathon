@@ -27,7 +27,7 @@ python3 - <<'EOF'
 import json, glob
 P = {"claude-opus-5-5": (4, 20), "claude-sonnet-5-5": (2, 10)}
 t = 0
-for f in glob.glob("traces/*.jsonl"):
+for f in glob.glob("traces/2*.jsonl"):   # the builder's own traces, not the hidden-N copies
     for l in open(f):
         e = json.loads(l)
         if e.get("event") == "model_call":
@@ -71,16 +71,25 @@ final/
 
 ## 2. Build
 
-Use plain `python3`, Opus, no `--no-llm` (the first build must extract), and keep the log with `tee`:
+Use plain `python3`, Opus, no `--no-llm` (the first build must extract), and keep the console output with `tee`.
+The first final brief is `hidden-1`, the second `hidden-2`; these names are only for the submitted files, the slot stays
+the brief's name.
 
 ```bash
 mkdir -p traces submission
-LLM_MODEL=claude-opus-5-5 python3 builder/build.py final/<name1>/<name1>.md final/<name1>/openapi.json 2>&1 | tee traces/final-<name1>.log
-LLM_MODEL=claude-opus-5-5 python3 builder/build.py final/<name2>/<name2> final/<name2>/openapi.json 2>&1 | tee traces/final-<name2>.log
+python3 builder/build.py final/<name1>/<name1>.md final/<name1>/openapi.json 2>&1 | tee traces/hidden-1.log
+python3 builder/build.py final/<name2>/<name2> final/<name2>/openapi.json 2>&1 | tee traces/hidden-2.log
 ```
 
-The last line is JSON: `{"slot", "workflow_id", "agent_id", "selftest", "warnings"}`. The trace is the newest
-`traces/<time>-<slot>.jsonl`.
+The last line is JSON: `{"slot", "workflow_id", "agent_id", "selftest", "warnings"}`. The builder's trace is the newest
+`traces/<time>-<slot>.jsonl`. Section 4 turns both into the two submitted trace files of each brief:
+
+| File | What is in it |
+|---|---|
+| `traces/hidden-N.log` | The official trace: the build's console output, then the builder's whole trace, one JSON object per line |
+| `traces/hidden-N.jsonl` | The builder's trace alone, unchanged, for machine reading |
+
+Only these two names are committed from `traces/`; `.gitignore` keeps every other trace out.
 
 ## 2a. Testing during the final window (20:00 to 23:00)
 
@@ -109,7 +118,7 @@ workspace; a ten-customer run took up to 8 minutes per run on a busy evening). S
 6. No key in the trace or the log:
 
 ```bash
-grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/*<slot>*.jsonl traces/final-<slot>.log   # must be 0
+grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/2*-<slot>.jsonl traces/hidden-N.log traces/hidden-N.jsonl   # every count must be 0
 ```
 
 7. Optional, if time is left: one chat turn against the new workflow to see the opening line (a chat skips the first code
@@ -120,24 +129,27 @@ grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/*<slot>*.
 **Export right after every build**, before anything else touches the workflow. The submitted workflow must be the output
 of the run whose trace we submit:
 
-- If the builder runs again for a brief (a fix, a rebuild), the new run's trace, build log and export replace the old
+- If the builder runs again for a brief (a fix, a rebuild), the new run's two trace files and its export replace the old
   three together. Never mix a trace of one run with the export of another.
-- The check below must pass for the three files that go into `submission/`.
+- The check below must pass for the three files of each brief: `traces/hidden-N.log`, `traces/hidden-N.jsonl` and
+  `submission/hidden-N.workflow.json`.
 
 ```bash
+N=1; SLOT=<slot>          # N=2 for the second final brief
 # run the build, then export at once
-LLM_MODEL=claude-opus-5-5 python3 builder/build.py final/<name>/<name>.md final/<name>/openapi.json 2>&1 | tee traces/final-<name>.log
-python3 -c "import freya,json,sys; s=json.load(open('.freya-agents.json'))[sys.argv[1]]; print(freya.export_workflow(s['workflow_id'], 'submission/'+sys.argv[1]+'.workflow.json'))" <slot>
-cp "$(ls -t traces/*-<slot>.jsonl | head -1)" submission/<slot>.trace.jsonl
-cp traces/final-<name>.log submission/<slot>.build.log
+python3 builder/build.py final/<name>/<name>.md final/<name>/openapi.json 2>&1 | tee traces/hidden-$N.log
+python3 -c "import freya,json,sys; s=json.load(open('.freya-agents.json'))[sys.argv[1]]; print(freya.export_workflow(s['workflow_id'], sys.argv[2]))" $SLOT submission/hidden-$N.workflow.json
+T="$(ls -t traces/2*-$SLOT.jsonl | head -1)"
+cp "$T" traces/hidden-$N.jsonl
+cat "$T" >> traces/hidden-$N.log          # the official trace: console output, then the whole trace
 
 # the export is this run's workflow: every field of the build output is in it, and the ids match the trace
-python3 - <slot> <<'PY'
+python3 - $N $SLOT <<'PY'
 import json, sys
-slot = sys.argv[1]
-ex = json.load(open(f"submission/{slot}.workflow.json"))
+n, slot = sys.argv[1], sys.argv[2]
+ex = json.load(open(f"submission/hidden-{n}.workflow.json"))
 built = json.load(open(f"out/{slot}.workflow.json"))
-saved = [json.loads(l) for l in open(f"submission/{slot}.trace.jsonl") if '"event": "saved"' in l][-1]
+saved = [json.loads(l) for l in open(f"traces/hidden-{n}.jsonl") if '"event": "saved"' in l][-1]
 def walk(a, b, p=""):
     # every field of ours must be in the export with the same value; the platform may add fields of its own
     if isinstance(a, dict):
@@ -160,9 +172,10 @@ PUB-10; its leftover `firstMessage` is never spoken).
 ### Commit and hand in
 
 ```bash
-git add final submission
-git commit -m "Final build: <slot>"
+git add final submission traces/hidden-*.log traces/hidden-*.jsonl
+git commit -m "Final build: hidden-$N"
 git push
+git ls-files traces/hidden-1.log traces/hidden-1.jsonl traces/hidden-2.log traces/hidden-2.jsonl   # each submitted brief's two trace files must be listed
 git rev-parse HEAD        # the commit we submit
 ```
 

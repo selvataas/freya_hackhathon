@@ -6,5 +6,7 @@ results/
 .venv/
 cache/
 out/
-traces/
+traces/*
+!traces/hidden-*.log
+!traces/hidden-*.jsonl
 .freya-agents.json
