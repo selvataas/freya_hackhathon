@@ -98,7 +98,7 @@ The last line is JSON: `{"slot", "workflow_id", "agent_id", "selftest", "warning
 
 Only these two names are committed from `traces/`; `.gitignore` keeps every other trace out.
 
-## 2a. Testing during the final window (20:00 to 23:00)
+## 2a. Testing during the final window (20:00 to 23:00 Istanbul, 17:00 to 20:00 UTC)
 
 Platform tests may be limited or slow while every team runs simulations at once (one simulation at a time per
 workspace; a ten-customer run took up to 8 minutes per run on a busy evening). So:
@@ -201,13 +201,13 @@ Then fill `docs/submission-template.json` (copy it to `submission/submission.jso
 
 ### Hand-in checklist
 
-Fill these in before Sunday; they are not known yet:
-
 | Item | Value |
 |---|---|
-| Team name | `<TEAM NAME>` |
-| Where to submit | `<SUBMISSION URL OR ADDRESS>` |
-| Deadline | `<DATE AND TIME>` |
+| Team name | `<TAKIM ADINIZ>` |
+| Where to submit | Comes in the organisers' email with the submission steps (the kit email). |
+| Deadline | 20:00 UTC = 23:00 Istanbul, Sunday 11 October. Our target: everything sent by 22:00 Istanbul (19:00 UTC). |
+
+The repository stays private until step 4, right before the form is sent.
 
 1. Scan the whole history for keys once more (prints counts only, never a value):
 
@@ -222,14 +222,21 @@ rm /tmp/history.txt
 
    If anything is found: do not make the repo public. Rotate the key first, then rewrite the history.
 
-2. Make the repository public: GitHub, `selvataas/freya_hackhathon`, Settings, General, Danger Zone, Change visibility,
-   Public. Or `gh repo edit selvataas/freya_hackhathon --visibility public --accept-visibility-change-consequences`.
-3. Open the repository in a private browser window to check it can be read without a login.
-4. Fill `submission/submission.json` from the template: team name, the commit (`git rev-parse HEAD`). The repo, the run
-   command and the paths are already in it.
-5. Submit at the address above: the repository URL with the commit, the two `submission/<slot>.workflow.json`, the two
-   traces, and the form.
-6. After submitting: no more pushes to the submitted commit's branch until the organisers confirm receipt.
+2. The last build commit is pushed. Fill `submission/submission.json` from the template: the team name and the commit
+   (`git rev-parse HEAD`). The repo, the run command and the paths are already in it. This file is the form's content;
+   it is not committed, since it holds the commit's own id.
+3. Check that the submitted commit holds the four files the form points to:
+
+```bash
+git ls-tree -r --name-only HEAD submission/hidden-1.workflow.json submission/hidden-2.workflow.json traces/hidden-1.log traces/hidden-2.log   # all four listed
+```
+
+4. Right before sending the form, make the repository public: GitHub, `selvataas/freya_hackhathon`, Settings, General,
+   Danger Zone, Change visibility, Public. Or
+   `gh repo edit selvataas/freya_hackhathon --visibility public --accept-visibility-change-consequences`.
+5. Open the repository in a private browser window to check it can be read without a login.
+6. Send the form at the address from the organisers' email, before 23:00 Istanbul (target 22:00).
+7. After submitting: no more pushes to the submitted commit's branch until the organisers confirm receipt.
 
 ## 5. If something goes wrong
 
