@@ -152,6 +152,35 @@ else:
 '''
 
 
+# after the start lookups: their answers as one line per record, so that the dialogue model does not mix up records
+FACTS_CODE = '''import json
+def flat(x, prefix):
+    lines = []
+    if isinstance(x, dict):
+        simple = [(k, v) for k, v in x.items() if not isinstance(v, (dict, list))]
+        if simple:
+            lines.append(prefix + "; ".join(str(k) + ": " + str(v) for k, v in simple))
+        for k, v in x.items():
+            if isinstance(v, (dict, list)):
+                lines += flat(v, prefix + str(k) + " > ")
+    elif isinstance(x, list):
+        if not x:
+            lines.append(prefix + "(none)")
+        for i, v in enumerate(x):
+            lines += flat(v, prefix + "#" + str(i + 1) + " ")
+    else:
+        lines.append(prefix + str(x))
+    return lines
+for name in NAMES:
+    raw = vars.get("start_" + name)
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        data = raw
+    vars["start_" + name + "_text"] = "\\n".join(flat(data, "")) if data not in (None, "") else "no answer: call the tool yourself"
+'''
+
+
 def _leaf(d, default):
     leaf = {"type": d["type"] if d["type"] in ("string", "number", "integer", "boolean") else "string", "default": default}
     if d.get("enum"):
@@ -222,6 +251,7 @@ def render(spec, tools):
         "Unless the instructions say otherwise, a weekday the customer names without more is its first day after today in the " \
         "calendar. Say a date to the customer as day, month and weekday in the call's language, never as YYYY-MM-DD; send dates to " \
         "tools as YYYY-MM-DD. Read times, amounts and names exactly as the tools give them.\n\n" + \
+        "Answer what the customer asks with the facts you have before you go on with the steps. " \
         "Call one tool per message and speak to the customer after every tool answer. Never say that something was done unless " \
         "the tool's answer says so; when a tool fails, say so plainly."
     system = (f"You are the phone assistant of {spec.get('business_name') or 'the business'}. Speak only {lang}: "
@@ -232,7 +262,7 @@ def render(spec, tools):
     starts = [n for n in spec.get("start_tools") or [] if n in tools and _all_from_variables(tools[n], entries.get(n) or {}, call_vars)]
     if starts:
         task += "\n\nLooked up for you when the call started (use these answers; call the tool again only when you need something new):\n" + \
-            "\n".join(f"- {n}: {{{{start_{n}}}}}" for n in starts)
+            "\n".join(f"- {n}, one line per record:\n{{{{start_{n}_text}}}}" for n in starts)
     task += ("\n\nWhen the customer has nothing else, the program says the closing sentence and ends the call: do not say goodbye "
              "yourself, ask whether there is anything else instead.")
     done = R._ex("done", "string", "yes = the customer's LAST message says they need nothing else, says goodbye or thanks to close the call, "
@@ -253,7 +283,7 @@ def render(spec, tools):
     if "{{" in cal.replace("{{calendar}}", "") or "}}" in cal:
         raise ValueError("calendar code contains a double curly brace")
     nodes = {"calendar": calendar}
-    chain = ["start_" + n for n in starts] + ["main"]
+    chain = ["start_" + n for n in starts] + (["facts"] if starts else []) + ["main"]
     calendar["passthrough_default_transition"] = chain[0]
     calendar["transitions"] = [{"target_node": chain[0], "description": "always", "condition": {"operator": "always"}}]
     for i, n in enumerate(starts):
@@ -263,6 +293,16 @@ def render(spec, tools):
                                "passthrough_default_transition": chain[i + 1], "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
                                "pre_actions": [t], "response_mapping": [{"path": "data", "variable": "start_" + n}],
                                "transitions": [{"target_node": chain[i + 1], "description": "always", "condition": {"operator": "always"}}]}
+    if starts:
+        code = FACTS_CODE.replace("NAMES", json.dumps(starts))
+        nodes["facts"] = {"name": "facts", "node_type": "code", "position": {"x": 200, "y": 0}, "passthrough": True,
+                          "passthrough_default_transition": "main", "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
+                          "pre_actions": [{"type": "function", "function": {"name": "code_exec", "handler": "__function__:code_exec",
+                                           "parameters": {"type": "object", "properties": {"code": {"type": "string", "default": code},
+                                                                                          "timeout_ms": {"type": "number", "default": 20000}}}}}],
+                          "transitions": [{"target_node": "main", "description": "always", "condition": {"operator": "always"}}]}
+        if "{{" in code or "}}" in code:
+            raise ValueError("facts code contains a double curly brace")
     nodes["main"] = main
     nodes["bye"] = {"name": "bye", "node_type": "end_call", "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True, "transitions": [],
                     "terminal": {"type": "function", "function": {"name": "call_closed", "handler": "__function__:end_call",

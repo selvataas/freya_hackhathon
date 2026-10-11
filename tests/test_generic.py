@@ -24,8 +24,13 @@ def main():
     spec = json.load(open(ROOT / "tests" / "fixtures" / "generic-veteriner.spec.json"))
     wf = generic.render(spec, tools)
     nodes = wf["nodes"]
-    check(list(nodes) == ["calendar", "start_find_appointments", "main", "bye"] and wf["initial_node"] == "calendar",
-          "calendar, the start lookup, the conversation, the closing node")
+    check(list(nodes) == ["calendar", "start_find_appointments", "facts", "main", "bye"] and wf["initial_node"] == "calendar",
+          "calendar, the start lookup, its answer as lines, the conversation, the closing node")
+    fcode = nodes["facts"]["pre_actions"][0]["function"]["parameters"]["properties"]["code"]["default"]
+    fenv = {"vars": {"start_find_appointments": json.dumps({"ok": True, "appointments": [{"pet_name": "A", "time": "10:00"}, {"pet_name": "B", "time": "11:30"}]})}}
+    exec(fcode, fenv)
+    check(fenv["vars"]["start_find_appointments_text"].splitlines() == ["ok: True", "appointments > #1 pet_name: A; time: 10:00", "appointments > #2 pet_name: B; time: 11:30"],
+          "a start answer becomes one line per record")
     start = nodes["start_find_appointments"]["pre_actions"][0]["function"]["parameters"]["properties"]
     check(start["url"]["default"] == "https://mock.example/owners/{{callerPhone}}/appointments" and start["method"]["default"] == "GET",
           "the start lookup's path parameter comes from the call variable")
@@ -38,7 +43,7 @@ def main():
     check(main["transitions"][0]["target_node"] == "bye" and main["extraction_schema"][0]["name"] == "done", "the conversation closes through 'done'")
     check(nodes["bye"]["terminal"]["function"]["parameters"]["properties"]["spoken_message"]["default"] == spec["closing_line"],
           "the closing node says the closing line")
-    check("{{calendar}}" in main["task_message"] and "{{start_find_appointments}}" in main["task_message"], "the briefing holds the calendar and the start lookup")
+    check("{{calendar}}" in main["task_message"] and "{{start_find_appointments_text}}" in main["task_message"], "the briefing holds the calendar and the start lookup")
     code = nodes["calendar"]["pre_actions"][0]["function"]["parameters"]["properties"]["code"]["default"]
     env = {"vars": {"now": "2026-11-03T14:20:00+03:00"}}
     exec(code, env)
