@@ -16,6 +16,7 @@ Ground rules from the README and CLAUDE.md:
 cd freya_hackhathon
 git pull                                   # the version we submit
 source env.sh                              # FREYA_API_KEY, FREYA_API_URL, FREYA_BANK_TEAM_KEY, ANTHROPIC_API_KEY
+unset LLM_MODEL BUILDER_MODEL                # the builder then uses its default, claude-opus-5-5
 python3 --version                          # 3.9 or newer; no packages needed
 python3 -c "import sys; sys.path.insert(0,'builder'); import extract; print(extract.MODEL)"   # claude-opus-5-5
 ```
@@ -71,14 +72,19 @@ final/
 
 ## 2. Build
 
-Use plain `python3`, Opus, no `--no-llm` (the first build must extract), and keep the console output with `tee`.
+Use plain `python3`, Opus, `--no-cache`, no `--no-llm`, and keep the console output with `tee`.
+
+**Every build whose agent we submit runs with `--no-cache`**, the first one and every rebuild after a fix. The spec is
+then read from the brief in this run, and every model call that made it is in this run's trace. A build from the cache
+has no model call in its trace, and the organisers' rerun has no cache. A build costs about $0.50 to $0.80 and takes 2 to
+3 minutes, well inside 30 minutes.
 The first final brief is `hidden-1`, the second `hidden-2`; these names are only for the submitted files, the slot stays
 the brief's name.
 
 ```bash
 mkdir -p traces submission
-python3 builder/build.py final/<name1>/<name1>.md final/<name1>/openapi.json 2>&1 | tee traces/hidden-1.log
-python3 builder/build.py final/<name2>/<name2> final/<name2>/openapi.json 2>&1 | tee traces/hidden-2.log
+python3 builder/build.py --no-cache final/<name1>/<name1>.md final/<name1>/openapi.json 2>&1 | tee traces/hidden-1.log
+python3 builder/build.py --no-cache final/<name2>/<name2> final/<name2>/openapi.json 2>&1 | tee traces/hidden-2.log
 ```
 
 The last line is JSON: `{"slot", "workflow_id", "agent_id", "selftest", "warnings"}`. The builder's trace is the newest
@@ -111,6 +117,7 @@ workspace; a ten-customer run took up to 8 minutes per run on a busy evening). S
    default). Read each one.
 4. The trace has: `start`, every `model_call` (model, purpose, tokens), `spec_compare`, `rendered` (nodes, tools),
    `selftest`, `dry_run` (valid), `saved` (workflow and agent id), `end` (build_seconds).
+   It has no `spec_cache_hit`: a submitted build reads its spec from the brief, with `--no-cache`.
 5. Read `out/<slot>.spec.json` against the brief. Reading is allowed, changing is not. Look at:
    call variable names, identity questions and wrong-answer limit, holidays, bands and deadlines, persuasion attempts,
    floor fields, outcome rows (`outcomes`), `custom_situations`, `unplaced_rules` (short or empty is normal),
@@ -137,7 +144,7 @@ of the run whose trace we submit:
 ```bash
 N=1; SLOT=<slot>          # N=2 for the second final brief
 # run the build, then export at once
-python3 builder/build.py final/<name>/<name>.md final/<name>/openapi.json 2>&1 | tee traces/hidden-$N.log
+python3 builder/build.py --no-cache final/<name>/<name>.md final/<name>/openapi.json 2>&1 | tee traces/hidden-$N.log
 python3 -c "import freya,json,sys; s=json.load(open('.freya-agents.json'))[sys.argv[1]]; print(freya.export_workflow(s['workflow_id'], sys.argv[2]))" $SLOT submission/hidden-$N.workflow.json
 T="$(ls -t traces/2*-$SLOT.jsonl | head -1)"
 cp "$T" traces/hidden-$N.jsonl
@@ -218,16 +225,16 @@ rm /tmp/history.txt
 | What | Do |
 |---|---|
 | Traceback in the builder | Read it. If it is a crash on an input the parser did not expect (a table, a file type, a missing field), fix the code generally, commit, build again. Never add the brief's values, names or rules to the code or prompts. |
-| `stop_reason` not `end_turn`, or `no usable spec` | Build again once. The second build costs the same again. |
-| `dry_run` refused | Read the error; it names the field. Fix the template code generally, build again: the spec comes from the cache, no new cost. |
+| `stop_reason` not `end_turn`, or `no usable spec` | Build again once, with `--no-cache`. The second build costs the same again. |
+| `dry_run` refused | Read the error; it names the field. Fix the template code generally, commit, build again with `--no-cache`. To check the fix first without cost, `--dry --no-llm` reads the cached spec; that run is never submitted. |
 | `Workspace plan limit reached` | Delete a workflow we do not submit (spike first). Never delete Base, brief-a or brief-b without a reason. |
-| Platform down (503, no answer) | Wait. The cache keeps the spec, so the next build does not pay again. |
-| A self-test scenario fails | Read the problem in the trace. A runtime bug: fix generally, build again (cached, free). A spec that is wrong for the brief: build again with `--no-cache` once (paid). |
+| Platform down (503, no answer) | Wait, then build again with `--no-cache`. |
+| A self-test scenario fails | Read the problem in the trace. A runtime bug: fix generally, check with `--dry --no-llm` (cached, free, not submitted), commit, then build again with `--no-cache`. A spec that is wrong for the brief: build again with `--no-cache`. |
 | Time is short | Submit the agent of the last good build with its own trace. One complete run beats a half-fixed one. |
 
-A rebuild of the same brief with the same model reads the spec from `cache/` and costs nothing. `--no-cache` forces a
-new extraction and costs again. `--no-llm` stops instead of calling the model: use it for rebuilds after a code fix, to be
-sure nothing is spent.
+A build that is submitted always runs with `--no-cache`, so its trace holds the model calls that made its spec. The
+cache is only for checks that are never submitted: `--dry --no-llm` rebuilds from the cached spec without any model call
+and without touching the workflow on Freya.
 
 ## 6. Do not
 
@@ -235,9 +242,9 @@ sure nothing is spent.
 - Do not edit a workflow on the platform, in the dashboard or with a hand-made PUT.
 - Do not change `freya.py`, `AGENT_LLM` or the agent model.
 - Do not commit `env.sh`, `.env` or a key. `git status` before every commit.
-- Do not run `--no-cache` without a reason (it pays a new extraction).
+- Do not submit a build that read its spec from the cache (`spec_cache_hit` in its trace). Submitted builds run with `--no-cache`.
 - Do not submit a workflow and a trace from different runs.
-- Do not delete `cache/` before the submission is done.
+- Do not delete `cache/` before the submission is done: the free `--dry --no-llm` checks need it.
 
 ## Submission template
 
