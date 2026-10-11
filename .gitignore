@@ -12,3 +12,5 @@ traces/*
 .freya-agents.json
 mock/.wrangler/
 mock/node_modules/
+!traces/final.log
+!traces/final.jsonl

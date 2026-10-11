@@ -1,6 +1,56 @@
-# Runbook: final briefs (Sunday evening)
+# Runbook: the final (Sunday evening)
 
-Step-by-step for the two final briefs. Read it end to end once before the briefs open.
+**The final as the hackathon page describes it on 11 October (this section replaces sections 1 to 4 and the submission
+template at the end, which were written for two briefs with their own tool API files).** One case, Freya Bank's
+credit card statement-debt line, in Turkish: one zip with a folder of the bank's documents (Markdown, Word, PDF,
+Excel), a service contract, the bank's test customers and six example conversations. We write a mock of the bank's
+services on Cloudflare Workers, deploy it before the build and keep it running until the results are out; the phone
+agent calls only the mock. Deadline 20:00 UTC (23:00 Istanbul): `submission.json` to the address in the kit email.
+Sections 0 (19:30 pre-check) and 5a (platform down) still apply; read `hidden-N` there as `final`.
+
+F1. **Get the case** at 17:00 UTC (20:00 Istanbul), from the Submit tab of the page or the e-mail. Unzip it under
+    `case/`, content unchanged. The slot (the workflow's name) is the folder's name.
+
+```bash
+mkdir -p case && unzip -q <the zip> -d case && ls case     # case/<Folder>/
+```
+
+F2. **The mock** (`mock/`, generic; the final's data go only into `mock/data/`, never into `builder/`):
+    - `mock/data/customers.json`: the zip's test customers as `[{customer_id, identity: {field: value}, products:
+      [{product_id, ...the fields the contract's account answer has}]}]`.
+    - `mock/data/config.json`: for each operation of the service contract, its `path`, its role (`verify_identity`,
+      `get_account`, `create_promise`, `add_note`, `schedule_callback`, `transfer_to_agent`, `close_call`), its
+      request field names (`fields`: role -> name) and response field names (`response`: role -> name), the wrong-answer
+      limit (`max_wrong_total`) and the hint value for a date with day and month swapped, if the contract has one.
+    - Deploy and check, then commit the mock data on its own ("Mock data for the final case"), before the build, so
+      the build runs on a clean tree:
+
+```bash
+cd mock && wrangler deploy && cd ..
+curl -s https://fides-mock.fides-freya.workers.dev/health          # ok, the tools, the number of customers
+curl -s -X POST https://fides-mock.fides-freya.workers.dev/<verify path> -H 'content-type: application/json' -d '{...one test customer...}'
+git add mock/data && git commit -m "Mock data for the final case" && git push
+```
+
+F3. **Build** with `--no-cache`, the folder and the mock's address; then export at once and keep the trace:
+
+```bash
+SLOT=<Folder>; M=https://fides-mock.fides-freya.workers.dev
+python3 builder/build.py --no-cache case/$SLOT $M 2>&1 | tee traces/final.log
+python3 builder/platform_calls.py export $SLOT submission/final.workflow.json
+T="$(ls -t traces/2*-$SLOT.jsonl | head -1)"
+cp "$T" traces/final.jsonl && cat "$T" >> traces/final.log
+grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/final.log traces/final.jsonl   # every count must be 0
+```
+
+    Check the trace as in section 3: `documents` (every file read; a skipped one is named), `contract` (which file,
+    or written by the model), `model_call`s, `selftest` n/n, `dry_run`, `saved`, `end`, `git_dirty: false`. Read
+    `out/$SLOT.spec.json`: `language` is `tr`, the phrases are Turkish, the outcome table and the tool fields match
+    the contract. The export check of section 4 works with `submission/final.workflow.json` and `traces/final.jsonl`.
+F4. **Commit and send**: `git add case submission traces/final.log traces/final.jsonl`, commit, push. Fill
+    `submission/submission.json` from `docs/submission-template.json` (`commit` = `git rev-parse HEAD`), make the
+    repository public (section 4), and send the file to the address in the kit email before 23:00 Istanbul.
+    Optional: the Claude Code session logs of building the builder may be shared too.
 
 Ground rules from the README and CLAUDE.md:
 
