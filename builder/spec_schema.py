@@ -126,7 +126,7 @@ def A(items, d=None):
 PHRASE = O({"text": S("string"), "verbatim": S("boolean", "true only if the brief gives this exact wording in quotes")})
 
 SCHEMA = O({
-    "language": S("string", "Language the agent speaks, e.g. en."),
+    "language": S("string", "The language of the call, the one the brief's customers speak, as an ISO 639-1 code: en, tr, ..."),
     "bank_name": S("string"),
     "variables": O({
         "customer_id": S("string", "Name of the call variable holding the customer id."),

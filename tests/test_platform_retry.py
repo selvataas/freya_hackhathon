@@ -88,6 +88,19 @@ def repo_copy():
     (d / "cache").mkdir()
     for f in (ROOT / "cache").glob("spec-*.json"):
         shutil.copy(f, d / "cache")
+    # the cached Brief A spec under the key of the current prompt version, so that --no-llm finds it
+    sys.path.insert(0, str(ROOT / "builder"))
+    import extract
+    briefs = [("brief-a.md", (ROOT / "briefs" / "brief-a.md").read_text(errors="replace"))]
+    api = (ROOT / "tools" / "openapi.json").read_text()
+    now, version = extract.cache_key(briefs, api), extract.PROMPT_VERSION
+    for v in range(int(version), 0, -1):
+        extract.PROMPT_VERSION = str(v)
+        old = d / "cache" / f"spec-{extract.cache_key(briefs, api)}.json"
+        if old.exists():
+            shutil.copy(old, d / "cache" / f"spec-{now}.json")
+            break
+    extract.PROMPT_VERSION = version
     return d
 
 

@@ -211,8 +211,20 @@ def extraction(spec, phase):
     return _extraction(spec, phase) + _custom_field(spec, phase) + [_state_field()]
 
 
+# For a call that is not in English: the program reads day, time and number words in English, so the extraction writes
+# them that way (the builder's own words, not a brief's)
+NOT_ENGLISH_DAYS = (" The customer does not speak English: write the day and time words in plain English, the way the program reads "
+                    "them, e.g. 'today', 'tomorrow', 'next Friday', 'this Friday', 'the 26th', '26 October', 'at 11:00', 'after 14:00', "
+                    "'next week', 'the end of the month'; numbers in digits.")
+NOT_ENGLISH_ANSWER = ("The answer in the LAST message. The customer does not speak English: write a date as day, English month name and "
+                      "year (e.g. '19 October 1983'), digits as digits (e.g. '4471'), a year in digits, anything else exactly as said. "
+                      "If the customer corrects themselves, only the corrected value. Empty if none.")
+
+
 def _extraction(spec, phase):
     hs, rq = spec.get("hardship") or {}, spec.get("requests") or {}
+    other = not str(spec.get("language") or "en").strip().lower().startswith("en")
+    days = NOT_ENGLISH_DAYS if other else ""
     q_kind = _ex("q_kind", "string", "Only if the customer's LAST message asks the agent a question: ai = asks if they talk to a robot, a machine or an AI; "
                  "scam = asks if this is a scam or fraud; purpose = asks what the call is about or who is calling; other = any other question; none = no question.",
                  ["ai", "scam", "purpose", "other"])
@@ -223,7 +235,7 @@ def _extraction(spec, phase):
                 "deceased = says the customer has died; human = asks for a human or a real person; not_talking = says they do not want to talk; refuses = refuses to help; "
                 "question = only asks a question; unclear = hello, go ahead, who is this, or anything else.",
                 ["confirmed", "other_person", "wrong_number", "deceased", "human", "not_talking", "refuses", "question", "unclear"]),
-            _ex("cb_phrase", "string", "If the LAST message says when the customer can be reached: the day and time words exactly as said, e.g. 'Thursday after two'. Empty otherwise."),
+            _ex("cb_phrase", "string", "If the LAST message says when the customer can be reached: the day and time words exactly as said, e.g. 'Thursday after two'. Empty otherwise." + days),
             q_kind]
     if phase == "talk_id":
         return [
@@ -232,7 +244,7 @@ def _extraction(spec, phase):
                 "refuse = clearly will not answer; asks_purpose = asks what the call is about instead of answering; human = asks for a human; not_talking = does not want to talk; "
                 "question = asks another question; unclear = anything else.",
                 ["answer", "already_given", "refuse", "asks_purpose", "human", "not_talking", "question", "unclear"]),
-            _ex("id_answer", "string", "The answer in the LAST message, exactly as said, words and digits as they are. If the customer corrects themselves, only the corrected value. Empty if none."),
+            _ex("id_answer", "string", NOT_ENGLISH_ANSWER if other else "The answer in the LAST message, exactly as said, words and digits as they are. If the customer corrects themselves, only the corrected value. Empty if none."),
             _ex("id_iso", "string", "If the LAST message gives a date: YYYY-MM-DD when it has day, month and year; --MM-DD when it has only day and month. "
                 "Read a date given only as numbers as day, month, year. Empty otherwise."),
             _ex("last_message", "string", "The LAST customer message, word for word."),
@@ -249,7 +261,7 @@ def _extraction(spec, phase):
             "When a message both refuses and names a day or amount, use propose. When it mentions hardship, use hardship.",
             ["yes", "no", "propose", "too_much", "vague", "hardship", "already_paid", "dispute", "restructuring", "human", "not_talking", "question", "change_recorded", "other"]),
         _ex("date_phrase", "string", "The words the customer used in the LAST message for the day they will PAY, exactly as said (e.g. 'Thursday', 'on the 3rd', 'the ninth of March'). "
-            "If they correct themselves, only the corrected day. Not days that are about anything else. Empty if they named no payment day."),
+            "If they correct themselves, only the corrected day. Not days that are about anything else. Empty if they named no payment day." + days),
         _ex("amount", "string", "The amount the customer offers to pay in the LAST message, in digits, e.g. 455.50. If they correct themselves, only the corrected amount. Empty if they named no amount."),
         _ex("applies_to_all", "string", "When the customer names a day or amount: yes = for all products / everything; no = only for one product; unknown = not said.", ["yes", "no", "unknown"]),
         q_kind]

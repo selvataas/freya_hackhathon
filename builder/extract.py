@@ -5,7 +5,7 @@ from spec_schema import SCHEMA, SCHEMA_VERSION, SITUATIONS, NOTE_SITUATIONS, TOO
 
 MODEL = os.environ.get("LLM_MODEL") or os.environ.get("BUILDER_MODEL") or "claude-opus-5-5"
 EFFORT = os.environ.get("BUILDER_EFFORT", "high")
-PROMPT_VERSION = "6"
+PROMPT_VERSION = "7"
 CACHE = pathlib.Path(__file__).resolve().parent.parent / "cache"
 
 INSTRUCTIONS = f"""You read a bank's specification ("brief") for an outbound collections phone call, and the bank's tool API (OpenAPI).
@@ -20,6 +20,8 @@ General rules
 Phrases
 - Every phrase must have text. If the brief quotes the exact wording, copy it character for character and set verbatim=true.
   Otherwise write one short natural sentence that follows the brief's rules for that moment, and set verbatim=false.
+- Write every phrase in the language of the call: the language the brief's customers speak (the field language, an ISO 639-1
+  code such as en or tr). A quoted wording stays as the brief gives it.
 - Placeholders in angle brackets (<address>, <product>, <amount>, <days>, <date>, <time>) are filled by the program. Use only the ones named for that phrase.
 - "opening" must satisfy every rule for the first sentence, and must not mention the debt, the product or the reason for the call.
 - "identity_question": if the brief quotes the question with call variables, write it with <address> in place of the person's name and set verbatim=true.

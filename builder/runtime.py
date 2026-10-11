@@ -47,9 +47,46 @@ VARIANTS = {
 }
 
 
+# the same lines in Turkish; the spec's language picks the set (English for a language the builder does not know)
+VARIANTS_TR = {
+    "go_on": ["Devam edin.", "Lütfen devam edin.", "Dinliyorum.", "Acele etmeyin."],
+    "sorry": ["Kusura bakmayın.", "Özür dilerim.", "Pardon, benim hatam."],
+    "yes_no": ["Evet ya da hayır demeniz yeterli.", "Sadece evet ya da hayır, lütfen.", "Kısaca evet ya da hayır yeterli."],
+    "not_understood": ["Pardon, anlayamadım.", "Kusura bakmayın, duyamadım.", "Pardon, tekrar eder misiniz?"],
+    "date": ["Sadece tarihi söyler misiniz: gün, ay ve yıl.", "Tam tarihi söyler misiniz: gün, ay ve yıl?", "Gün, ay ve yıl, lütfen."],
+    "digits": ["Sadece <n> haneyi tek tek söyler misiniz?", "<n> haneyi tek tek okur musunuz?", "<n> haneyi yavaşça söyler misiniz?"],
+    "digits_any": ["Sadece rakamları tek tek söyler misiniz?", "Rakamları tek tek okur musunuz?"],
+    "year_only": ["Sadece yılı söyler misiniz?", "Yılı söyler misiniz?", "Hangi yıl?"],
+    "month_only": ["Sadece ayı söyler misiniz?", "Hangi ay?"],
+    "day_only": ["Sadece günü söyler misiniz?", "Ayın kaçı?"],
+    "rest_digits": ["Kalan <k> haneyi söyler misiniz?", "Son <k> hane?", "Diğer <k> haneyi söyler misiniz?"],
+    "rest": ["Kalanını söyler misiniz?", "Ya devamı?"],
+}
+TEXTS_EN = dict(one_at_a_time=ONE_AT_A_TIME, retried_ok=RETRIED_OK, not_saved_final="Just to be clear, this has not been saved.",
+                just_that="Just that, please: ", on_date="on <date>")
+TEXTS_EN["or"] = " or "
+TEXTS_TR = dict(one_at_a_time="Tek tek ilerleyelim.", retried_ok="İlk denemede olmadı, ama tekrar denedim ve şimdi kaydedildi.",
+                not_saved_final="Açıkça belirteyim: bu kaydedilmedi.", just_that="Sadece şunu, lütfen: ", on_date="<date> günü")
+TEXTS_TR["or"] = " veya "
+TEXTS = dict(en=TEXTS_EN, tr=TEXTS_TR)
+WEEKDAYS_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+MONTHS_TR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+LANG = ["en"]  # the call's language, set from the spec at the start of every run of the brain
+
+
+def lang_of(S):
+    l = str(S.get("language") or "en").strip().lower()
+    return "tr" if l.startswith(("tr", "türk", "turk")) else "en"
+
+
+def own_line(key):
+    """One of the builder's own lines, in the call's language."""
+    return TEXTS.get(LANG[0], TEXTS["en"])[key]
+
+
 def variant(st, key, **kw):
     """The next way of saying one of the builder's lines in this call."""
-    opts = VARIANTS[key]
+    opts = (VARIANTS_TR if LANG[0] == "tr" else VARIANTS)[key]
     used = st.setdefault("variants", {})
     i = int(used.get(key) or 0)
     used[key] = i + 1
@@ -139,12 +176,16 @@ def fmt_amount(x):
         x = float(x)
     except Exception:
         return str(x)
-    if abs(x - round(x)) < 0.005:
-        return "{:,}".format(int(round(x)))
-    return "{:,.2f}".format(x)
+    s = "{:,}".format(int(round(x))) if abs(x - round(x)) < 0.005 else "{:,.2f}".format(x)
+    if LANG[0] == "tr":
+        s = s.replace(",", "_").replace(".", ",").replace("_", ".")  # 1.320,50
+    return s
 
 
 def fmt_date(d, today=None):
+    if LANG[0] == "tr":
+        year = " " + str(d.year) if today is not None and d.year != today.year else ""
+        return str(d.day) + " " + MONTHS_TR[d.month - 1] + year + " " + WEEKDAYS_TR[d.weekday()]  # 16 Ekim Cuma
     s = WEEKDAYS[d.weekday()].capitalize() + " " + str(d.day) + " " + MONTHS[d.month - 1].capitalize()
     if today is not None and d.year != today.year:
         s += " " + str(d.year)
@@ -843,8 +884,8 @@ def warn(st, msg):
 
 def when_words(S, date_iso, today):
     if date_iso == today.isoformat():
-        return phrase(S, "word_today") or "today"
-    return phrase(S, "word_on_date", date=fmt_date(D.fromisoformat(date_iso), today)) or ("on " + fmt_date(D.fromisoformat(date_iso), today))
+        return phrase(S, "word_today") or ("bugün" if LANG[0] == "tr" else "today")
+    return phrase(S, "word_on_date", date=fmt_date(D.fromisoformat(date_iso), today)) or own_line("on_date").replace("<date>", fmt_date(D.fromisoformat(date_iso), today))
 
 
 def answer_for_question(S, kind):
@@ -944,7 +985,7 @@ def on_custom_callback(S, V, st, now):
     if st["cb_asks"] >= int(tp.get("max_asks") or 2):
         return finish(S, V, st, "no_callback", phrase(S, "no_callback"))
     days = allowed_callback_days(S, now)
-    ask(V, st, "talk_pre", phrase(S, "callback_other_time", days=" or ".join(fmt_date(x, today) for x in days),
+    ask(V, st, "talk_pre", phrase(S, "callback_other_time", days=own_line("or").join(fmt_date(x, today) for x in days),
                                   start=tp.get("window_start") or "", end=tp.get("window_end") or "", address=address(S, V)))
 
 
@@ -1069,7 +1110,7 @@ def on_third_party(S, V, st, now):
     if st["cb_asks"] >= int(tp.get("max_asks") or 2):
         return finish(S, V, st, "no_callback", phrase(S, "no_callback"))
     days = allowed_callback_days(S, now)
-    ask(V, st, "talk_pre", privacy, phrase(S, "callback_other_time", days=" or ".join(fmt_date(x, today) for x in days),
+    ask(V, st, "talk_pre", privacy, phrase(S, "callback_other_time", days=own_line("or").join(fmt_date(x, today) for x in days),
                                            start=tp.get("window_start") or "", end=tp.get("window_end") or "", address=who))
 
 
@@ -1121,7 +1162,7 @@ def simple_question(q, st=None):
         return variant(st, "digits", n=n) if n else variant(st, "digits_any")
     if t == "year":
         return variant(st, "year_only")
-    return "Just that, please: " + (q.get("ask_text") or "")
+    return own_line("just_that") + (q.get("ask_text") or "")
 
 
 UNCLEAR_LIMIT = 4  # the builder's own limit: unclear or off-topic answers in the identity step before the call closes
@@ -1436,7 +1477,7 @@ def agree(S, V, st, p, amount, date_iso, today):
     p["offer"] = None
     if st.get("stage") == "ask_today" and len(st.get("products") or []) > 1 and open_products(st):
         # one product settled in answer to the shared question: the others now go one at a time
-        return next_product(S, V, st, today, ONE_AT_A_TIME)
+        return next_product(S, V, st, today, own_line("one_at_a_time"))
     return next_product(S, V, st, today)
 
 
@@ -1542,10 +1583,10 @@ def closing_words(S, V, st, today):
             if items:
                 lines.append(phrase(S, "recorded", items="; ".join(items)))
         if retried:
-            lines.append(RETRIED_OK)
+            lines.append(own_line("retried_ok"))
         lines.append(phrase(S, "after_promise"))
     if failed:
-        lines.append(NOT_SAVED_FINAL)
+        lines.append(own_line("not_saved_final"))
         lines.append(phrase(S, "service_error", product=", ".join(p["spoken"] for p in failed)))
     return finish(S, V, st, st.get("situation") or "", *lines)
 
@@ -1844,13 +1885,14 @@ def refusal(S, V, st, p, today):
         p["entered"] = True
         if len(open_products(st)) > 1:
             # the shared question is over: say so, so that the first offer reads as each product's own first attempt
-            return attempt_offer(S, V, st, p, today, ONE_AT_A_TIME)
+            return attempt_offer(S, V, st, p, today, own_line("one_at_a_time"))
     return attempt_offer(S, V, st, p, today)
 
 
 # ---------------------------------------------------------------- entry point
 
 def brain(V, S):
+    LANG[0] = lang_of(S)
     try:
         run(V, S)
     except Exception as e:
