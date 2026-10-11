@@ -8,7 +8,7 @@ Bir builder yazıyoruz: bankanın tahsilat brifingini (brief) ve araç API'sini 
 - Builder brief'e özel değer, kural veya isim içermemeli; her brief'i genel olarak okumalı.
 - Brief başına en fazla 30 dakika çalışma süresi.
 - Ajan yalnızca kitteki araç API'sini çağırabilir.
-- Workspace'te en fazla 10 workflow var; yenisini açmak yerine mevcut olanı güncelle.
+- Workspace'i en fazla 10 workflow ile sınırlı tutuyoruz (platform sınırı 200); yenisini açmak yerine mevcut olanı güncelle.
 - Her çalıştırma trace kaydı üretir: başlangıç/bitiş zamanı, her model çağrısı, oluşturulan workflow/agent id'si, yapılan testler. Trace'te API anahtarı olmamalı.
 
 ## Puanlama

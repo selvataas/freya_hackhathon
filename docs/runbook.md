@@ -46,7 +46,8 @@ python3 -c "import freya,json; w=json.load(open('.freya-agents.json'))['spike'][
 
 If it does not answer, the platform is down: wait and retry. Do not start a build on a dead platform (the build itself works, but the dry run and the save fail).
 
-The workspace holds at most 10 workflows. Today: Base (brief-a), brief-b, spike. Each final brief adds one.
+We keep the workspace at 10 workflows at most; the platform's limit is 200. Today: brief-a, brief-b, spike. Each final
+brief adds one (`hidden-1`, `hidden-2`).
 
 ## 1. Put the briefs in place
 
