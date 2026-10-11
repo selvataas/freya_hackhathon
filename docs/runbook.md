@@ -207,8 +207,8 @@ rm /tmp/history.txt
 2. Make the repository public: GitHub, `selvataas/freya_hackhathon`, Settings, General, Danger Zone, Change visibility,
    Public. Or `gh repo edit selvataas/freya_hackhathon --visibility public --accept-visibility-change-consequences`.
 3. Open the repository in a private browser window to check it can be read without a login.
-4. Fill `submission/submission.json` from the template: team name, repository URL, the commit (`git rev-parse HEAD`), and
-   per brief the slot, workflow id, agent id and the paths of the export, the trace and the build log.
+4. Fill `submission/submission.json` from the template: team name, the commit (`git rev-parse HEAD`). The repo, the run
+   command and the paths are already in it.
 5. Submit at the address above: the repository URL with the commit, the two `submission/<slot>.workflow.json`, the two
    traces, and the form.
 6. After submitting: no more pushes to the submitted commit's branch until the organisers confirm receipt.
@@ -241,57 +241,25 @@ sure nothing is spent.
 
 ## Submission template
 
-The official form's fields are not known to us yet; this template holds what the README asks for. Adjust the keys to
-the form when it opens. A copy is in `docs/submission-template.json`.
+The official form's fields, exactly as the hackathon page lists them. A copy is in `docs/submission-template.json`.
 
 ```json
 {
   "team": "",
-  "contact": "",
-  "repository": "https://github.com/selvataas/freya_hackhathon",
+  "repo": "https://github.com/selvataas/freya_hackhathon",
   "commit": "",
-  "builder_command": "LLM_MODEL=claude-opus-5-5 python3 builder/build.py <brief>... <openapi.json>",
-  "builder_model": "claude-opus-5-5",
-  "agent_model": "experimental-5",
-  "briefs": [
-    {
-      "brief": "",
-      "brief_files": [],
-      "tool_api_file": "",
-      "slot": "",
-      "workflow_id": "",
-      "agent_id": "",
-      "workflow_export": "submission/<slot>.workflow.json",
-      "trace": "submission/<slot>.trace.jsonl",
-      "build_log": "submission/<slot>.build.log",
-      "build_started": "",
-      "build_ended": "",
-      "build_seconds": null,
-      "model_calls": null,
-      "selftest": "",
-      "warnings": null
-    },
-    {
-      "brief": "",
-      "brief_files": [],
-      "tool_api_file": "",
-      "slot": "",
-      "workflow_id": "",
-      "agent_id": "",
-      "workflow_export": "submission/<slot>.workflow.json",
-      "trace": "submission/<slot>.trace.jsonl",
-      "build_log": "submission/<slot>.build.log",
-      "build_started": "",
-      "build_ended": "",
-      "build_seconds": null,
-      "model_calls": null,
-      "selftest": "",
-      "warnings": null
-    }
-  ],
-  "notes": ""
+  "run_command": "python3 builder/build.py {brief_path} {tool_api_path}",
+  "workflows": {
+    "hidden-1": "submission/hidden-1.workflow.json",
+    "hidden-2": "submission/hidden-2.workflow.json"
+  },
+  "traces": {
+    "hidden-1": "traces/hidden-1.log",
+    "hidden-2": "traces/hidden-2.log"
+  }
 }
 ```
 
-`build_started`, `build_ended`, `build_seconds`, `model_calls`, `selftest` and `warnings` come from the trace
-(`start`, `end`, the `model_call` count, `selftest`, `end.warnings`).
+- `team`: the team name. `commit`: the output of `git rev-parse HEAD` after the last push.
+- `run_command` is the page's command as it is. The organisers fill in the two paths.
+- `workflows` and `traces` point to files in the submitted commit; `git ls-files` must list all four.
