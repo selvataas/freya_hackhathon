@@ -76,6 +76,25 @@ def main():
     bank, sent = identity_call(4, ["44", "10"], "4410")
     check(bank.wrong == 0 and len(sent) == 1 and "'4410'" in sent[0], "'44' then '10': one answer, 4410")
 
+    # a day-and-month hint ('--10-30') from a day said in passing is used only for a date question
+    case = copy.deepcopy(sim_local.CASES["PUB-01"])
+    script = [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "14 March 1988"},
+              {"id_reply": "answer", "id_answer": "four four seven one", "id_iso": "--10-30"}, {"reply": "yes"}, {"reply": "yes"}]
+    bank, V, log, left = sim_local.simulate(spec, case, script)
+    sent = [t for who, t in log if who == "TOOL" and "phone_last4" in t]
+    check(bank.wrong == 0 and len(sent) == 1 and "'4471'" in sent[0], "digits with a day-and-month hint: the hint is ignored, 4471 is sent")
+    script = [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "", "id_iso": "--03-14"},
+              {"id_reply": "answer", "id_answer": "nineteen eighty-eight"}, {"id_reply": "answer", "id_answer": "4471"}, {"reply": "yes"}, {"reply": "yes"}]
+    bank, V, log, left = sim_local.simulate(spec, case, script)
+    sent = [t for who, t in log if who == "TOOL" and "date_of_birth" in t]
+    check(bank.wrong == 0 and len(sent) == 1 and "'1988-03-14'" in sent[0], "a date question still takes the day-and-month hint and joins the year")
+    nws = json.load(open(ROOT / "out" / "brief-nordwind.spec.json"))
+    nwc = next(c for c in json.load(open(ROOT / "tests" / "variants" / "cases.json")) if c["id"] == "NW-01")
+    script = [{"presence": "confirmed"}, {"id_reply": "answer", "id_answer": "N4 7QX", "id_iso": "--10-30"},
+              {"id_reply": "answer", "id_answer": "nineteen eighty", "id_iso": "--10-30"}] + nwc["script"][3:]
+    bank, V, log, left = sim_local.simulate(nws, nwc, script)
+    check(bank.wrong == 0 and bank.outcome == "committed", "a text answer and a year with a day-and-month hint: the hint is ignored")
+
     # spec lines written as instructions to the agent become lines for the customer
     turns = {
         "Ask the customer to say the month of their date of birth as a word.": "Could you say the month of your date of birth as a word?",

@@ -1214,8 +1214,11 @@ def on_identity_turn(S, V, st):
         raw = last  # the extraction marked an answer but gave no text: use the message itself
     m = re.match(r"^--(\d{2})-(\d{2})$", iso)
     if m:
-        # day and month without a year: keep them as words, they join with a year said later
-        raw = join(raw, str(int(m.group(2))) + " " + MONTHS[int(m.group(1)) - 1]) if 1 <= int(m.group(1)) <= 12 else raw
+        # day and month without a year: keep them as words, they join with a year said later. Only for a date
+        # question: for digits, a year or a text, a day said in passing ('the wedding is on the 30th') is not the answer
+        qs, i = questions(S), int(st.get("q_index") or 0)
+        if i < len(qs) and qs[i].get("answer_type") == "date" and 1 <= int(m.group(1)) <= 12:
+            raw = join(raw, str(int(m.group(2))) + " " + MONTHS[int(m.group(1)) - 1])
         iso = ""
     idn = S.get("identity") or {}
     if rk == "human" and handle_human(S, V, st, "talk_id"):
