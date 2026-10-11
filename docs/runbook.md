@@ -67,6 +67,9 @@ is already closed"): on 11 October one stayed `running` for two hours after its 
   (the address in the kit email), with the simulation id, its status and since when. The builds do not need a
   simulation, so go on with section 1 meanwhile.
 
+The builds need no simulation, but publishing and the export do need the platform: the dry run, the save and
+`export_workflow` are platform calls. If the platform answers 503/504 or not at all in the evening, follow section 5a.
+
 We keep the workspace at 10 workflows at most; the platform's limit is 200. Today: brief-a, brief-b, spike. Each final
 brief adds one (`hidden-1`, `hidden-2`).
 
@@ -296,13 +299,66 @@ git ls-tree -r --name-only HEAD submission/hidden-1.workflow.json submission/hid
 | `stop_reason` not `end_turn`, or `no usable spec` | Build again once, with `--no-cache`. The second build costs the same again. |
 | `dry_run` refused | Read the error; it names the field. Fix the template code generally, commit, build again with `--no-cache`. To check the fix first without cost, `--dry --no-llm` reads the cached spec; that run is never submitted. |
 | `Workspace plan limit reached` | Delete a workflow we do not submit (spike first). Never delete Base, brief-a or brief-b without a reason. |
-| Platform down (503, no answer) | Wait, then build again with `--no-cache`. |
+| Platform down (503, 504, no answer) | Section 5a. |
 | A self-test scenario fails | Read the problem in the trace. A runtime bug: fix generally, check with `--dry --no-llm` (cached, free, not submitted), commit, then build again with `--no-cache`. A spec that is wrong for the brief: build again with `--no-cache`. |
 | Time is short | Submit the agent of the last good build with its own trace. One complete run beats a half-fixed one. |
 
 A build that is submitted always runs with `--no-cache`, so its trace holds the model calls that made its spec. The
 cache is only for checks that are never submitted: `--dry --no-llm` rebuilds from the cached spec without any model call
 and without touching the workflow on Freya.
+
+## 5a. The platform is down in the evening
+
+What the builder does when the platform answers 503 or 504, or not at all (tested on 11 October against a fake API):
+
+- It has **no retry**. The first failed platform call stops the build with a traceback and exit code 1.
+- Everything before the first platform call is done and kept: the model calls, the spec cache, the self-test,
+  `out/<slot>.spec.json`, `out/<slot>.workflow.json` and the trace. The trace is written line by line and ends with
+  `error` (the platform's answer) and `end`.
+- The first platform call is the dry run. When it fails, nothing changed on the platform and `.freya-agents.json` is
+  as it was.
+- When the dry run passes and the save fails:
+  - First build of a slot (no `hidden-N` in `.freya-agents.json`): the create may have gone through although it
+    answered 504. Then the workspace has a workflow `hidden-N <date-time>` that `.freya-agents.json` does not know.
+  - A slot that exists: a PUT that went through leaves a new, unpublished version; the published version is still the
+    old one, and `.freya-agents.json` keeps the old version number.
+
+What to do:
+
+1. Build as in section 4, with `--no-cache`. The build does not need the platform until its last steps.
+2. **Keep the local outputs in any case**, also when the build stopped at the dry run or the save. `out/` and the
+   builder's traces are not committed, so copy them under names that say they are local, then commit and push:
+
+```bash
+N=1; SLOT=hidden-$N
+T="$(ls -t traces/2*-$SLOT.jsonl | head -1)"
+cp out/$SLOT.workflow.json submission/$SLOT.local.workflow.json
+cp out/$SLOT.spec.json submission/$SLOT.local.spec.json
+cp traces/$SLOT.log traces/$SLOT.platform-down.log && cat "$T" >> traces/$SLOT.platform-down.log
+cp "$T" traces/$SLOT.platform-down.jsonl
+grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/$SLOT.platform-down.log traces/$SLOT.platform-down.jsonl   # every count must be 0
+git add submission/$SLOT.local.* traces/$SLOT.platform-down.* briefs/hidden-*
+git commit -m "Local build output of $SLOT while the platform is down" && git push
+```
+
+3. Check the platform every 5 minutes, not more often: one chat turn as in section 0, or the simulation list of the
+   19:30 pre-check.
+4. **When the platform answers again: publish and export** by building again as in section 4, with `--no-cache`, and
+   export at once. The new run's trace, log and export are the submitted three; the `platform-down` files stay in the
+   repository as the record of the earlier run. Building again, and not publishing the earlier file, keeps the rules:
+   the submitted workflow is the output of the run whose trace we submit, that run reads the brief itself, and no
+   workflow is saved by hand. It costs another $0.50 to $0.80 and 2 to 3 minutes per brief.
+   - Before that build, if the failed run reached the save of a first build: look in the Freya dashboard for a
+     workflow `hidden-N <date-time>` that `.freya-agents.json` does not know. If there is one, delete it (it is not
+     submitted), so the workspace keeps one workflow per slot.
+   - An unpublished version left by a failed update needs nothing: the new build saves and publishes a newer one.
+5. **If the platform has not answered by 22:00 Istanbul (19:00 UTC)**, write to the organisers (the address in the
+   kit email): team Fides; the briefs affected; since when the platform answers 503/504 (the `error` line of the
+   trace); that the builds ran with `--no-cache` (start and end time from the trace); and that the builder's local
+   output and trace are committed at `<commit>` (`submission/hidden-N.local.workflow.json`,
+   `submission/hidden-N.local.spec.json`, `traces/hidden-N.platform-down.log`). Ask how they want it submitted. Put
+   the local files in the form only if they say so. Keep checking every 5 minutes; if the platform answers before the
+   deadline, do step 4 and submit as usual.
 
 ## 6. Do not
 
