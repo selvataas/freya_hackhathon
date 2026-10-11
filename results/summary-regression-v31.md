@@ -46,3 +46,14 @@ complete or the agent was silent more than 20 s; **simulator** when the simulate
 | Adversarial | 3/3, one run | 3/3, three runs |
 
 No run shows v31 / v20 breaking something v30 / v19 did. We stay on v31 / v20.
+
+## After the regression: the day-and-month hint fixed (v32 / v21)
+
+With the team's approval after the 17:00 freeze, commit `5a9a6c1` uses the day-and-month hint only for a date
+question (local scenarios GA-32 and GN-03 and unit tests fail on the old code and pass on the new). Published as
+brief-a v32 and brief-b v21 at 17:41, then one platform run each:
+
+| Case | Result |
+|---|---|
+| PUB-01 | pass |
+| PUB-12 talkative | pass. The customer again said "My cousin's wedding is on the thirtieth" while giving the phone digits; the extraction again gave `id_iso = --10-30`, and the agent sent 4410, not 1030. |
