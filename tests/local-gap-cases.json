@@ -1,0 +1,1655 @@
+[
+ {
+  "id": "GA-01",
+  "spec": "brief-a",
+  "title": "someone else answers: the number is not the customer's",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "wrong_number"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "wrong_number",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-02",
+  "spec": "brief-a",
+  "title": "someone else answers: the customer has died",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person"
+   },
+   {
+    "presence": "deceased"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "deceased",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-03",
+  "spec": "brief-a",
+  "title": "two callback times outside the window: no callback",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "tomorrow at 9 pm"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "Saturday at noon"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "no_callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-04",
+  "spec": "brief-a",
+  "title": "a callback time earlier than now is asked again",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "other_person",
+    "cb_phrase": "today at 10:00"
+   },
+   {
+    "presence": "other_person",
+    "cb_phrase": "today at 15:00"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-10-14",
+     "time": "15:00"
+    }
+   ],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-05",
+  "spec": "brief-a",
+  "title": "presence still unclear after the second ask",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "unclear"
+   },
+   {
+    "presence": "unclear"
+   }
+  ],
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "unclear",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-06",
+  "spec": "brief-a",
+  "title": "insists on a human before verification",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "human"
+   },
+   {
+    "presence": "human"
+   }
+  ],
+  "expected": {
+   "outcome": "transferred",
+   "reason": "human",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "general"
+    }
+   ]
+  }
+ },
+ {
+  "id": "GA-07",
+  "spec": "brief-a",
+  "title": "insists on a human after verification",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "human"
+   },
+   {
+    "reply": "human"
+   }
+  ],
+  "expected": {
+   "outcome": "transferred",
+   "reason": "human",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "general"
+    }
+   ]
+  }
+ },
+ {
+  "id": "GA-08",
+  "spec": "brief-a",
+  "title": "says the debt is not theirs",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "dispute"
+   }
+  ],
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "dispute",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-09",
+  "spec": "brief-a",
+  "title": "hardship, accepts the support team",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "hardship"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "transferred",
+   "reason": "support",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "support"
+    }
+   ]
+  }
+ },
+ {
+  "id": "GA-10",
+  "spec": "brief-a",
+  "title": "hardship, then names a date: the promise is recorded",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "hardship"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "30 October"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-30"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-11",
+  "spec": "brief-a",
+  "title": "the promise service fails twice",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "service_error",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "faults": [
+   {
+    "tool": "create_promise",
+    "fail_first_n": 2
+   }
+  ]
+ },
+ {
+  "id": "GA-12",
+  "spec": "brief-a",
+  "title": "does not want to talk, twice, after verification",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "not_talking"
+   },
+   {
+    "reply": "not_talking"
+   }
+  ],
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-13",
+  "spec": "brief-a",
+  "title": "an amount below the floor, then accepts the floor",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "propose",
+    "amount": "63.0",
+    "date_phrase": "Friday"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 126.0,
+     "date": "2026-10-16"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-14",
+  "spec": "brief-a",
+  "title": "an amount below the floor, refuses the floor and attempt 1",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "propose",
+    "amount": "63.0",
+    "date_phrase": "Friday"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "no"
+   }
+  ],
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-15",
+  "spec": "brief-a",
+  "title": "changes the date at the read-back",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "Friday"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-16"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-16",
+  "spec": "brief-a",
+  "title": "names a Saturday: the next business day is offered",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "Saturday"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-19"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-17",
+  "spec": "brief-a",
+  "title": "'next Friday' said on a Wednesday is the Friday of the following week",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "propose",
+    "date_phrase": "next Friday"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-18",
+  "spec": "brief-a",
+  "title": "three wrong answers spread over both questions",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "15 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "14 March 1988"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "1111"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "2222"
+   }
+  ],
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "failed",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GA-19",
+  "spec": "brief-a",
+  "title": "day and month swapped: the hint asks for the month in words, no wrong answer",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1990-04-05",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0,
+    "product_id": "p1"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "04/05/1990"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "5 April 1990"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4471"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "swap_hint": "day_month_swapped"
+ },
+ {
+  "id": "GB-01",
+  "spec": "brief-b",
+  "title": "every product already paid: paid",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0,
+    "product_id": "p1"
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0,
+    "product_id": "p2"
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0,
+    "product_id": "p3"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "19 October 1983"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4410"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "already_paid"
+   },
+   {
+    "reply": "already_paid"
+   },
+   {
+    "reply": "already_paid"
+   }
+  ],
+  "expected": {
+   "outcome": "paid",
+   "reason": null,
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p2",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p3",
+     "reason": "paid"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GB-02",
+  "spec": "brief-b",
+  "title": "one paid, two refused: the reason of the first product not noted paid",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0,
+    "product_id": "p1"
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0,
+    "product_id": "p2"
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0,
+    "product_id": "p3"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "19 October 1983"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4410"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "already_paid"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "no"
+   }
+  ],
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p2",
+     "reason": "refused"
+    },
+    {
+     "product_id": "p3",
+     "reason": "refused"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GB-03",
+  "spec": "brief-b",
+  "title": "a dispute on one product, the others promised",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0,
+    "product_id": "p1"
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0,
+    "product_id": "p2"
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0,
+    "product_id": "p3"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "19 October 1983"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4410"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "dispute"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p2",
+     "amount": 1320.0,
+     "date": "2026-10-16"
+    },
+    {
+     "product_id": "p3",
+     "amount": 140.0,
+     "date": "2026-10-16"
+    }
+   ],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "dispute"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GB-04",
+  "spec": "brief-b",
+  "title": "restructuring after one product was agreed: nothing recorded, no notes",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0,
+    "product_id": "p1"
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0,
+    "product_id": "p2"
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0,
+    "product_id": "p3"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "19 October 1983"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4410"
+   },
+   {
+    "reply": "no"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "restructuring"
+   }
+  ],
+  "expected": {
+   "outcome": "transferred",
+   "reason": "restructuring",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "restructuring"
+    }
+   ]
+  }
+ },
+ {
+  "id": "GB-05",
+  "spec": "brief-b",
+  "title": "one promise fails twice: the others are kept, a service_error note",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0,
+    "product_id": "p1"
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0,
+    "product_id": "p2"
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0,
+    "product_id": "p3"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "19 October 1983"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4410"
+   },
+   {
+    "reply": "yes"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p2",
+     "amount": 1320.0,
+     "date": "2026-10-14"
+    },
+    {
+     "product_id": "p3",
+     "amount": 140.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "service_error"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "faults": [
+   {
+    "tool": "create_promise",
+    "fail_first_n": 2
+   }
+  ]
+ },
+ {
+  "id": "GB-06",
+  "spec": "brief-b",
+  "title": "hardship, declines the support team: a hardship note per product",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0,
+    "product_id": "p1"
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0,
+    "product_id": "p2"
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0,
+    "product_id": "p3"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "19 October 1983"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4410"
+   },
+   {
+    "reply": "hardship"
+   },
+   {
+    "reply": "no"
+   }
+  ],
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "hardship",
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "hardship"
+    },
+    {
+     "product_id": "p2",
+     "reason": "hardship"
+    },
+    {
+     "product_id": "p3",
+     "reason": "hardship"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  }
+ },
+ {
+  "id": "GB-07",
+  "spec": "brief-b",
+  "title": "hardship, accepts the support team: no notes",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0,
+    "product_id": "p1"
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0,
+    "product_id": "p2"
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0,
+    "product_id": "p3"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "19 October 1983"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4410"
+   },
+   {
+    "reply": "hardship"
+   },
+   {
+    "reply": "yes"
+   }
+  ],
+  "expected": {
+   "outcome": "transferred",
+   "reason": "support",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "support"
+    }
+   ]
+  }
+ },
+ {
+  "id": "GB-08",
+  "spec": "brief-b",
+  "title": "insists on a human: no notes",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0,
+    "product_id": "p1"
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0,
+    "product_id": "p2"
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0,
+    "product_id": "p3"
+   }
+  ],
+  "script": [
+   {
+    "presence": "confirmed"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "19 October 1983"
+   },
+   {
+    "id_reply": "answer",
+    "id_answer": "4410"
+   },
+   {
+    "reply": "human"
+   },
+   {
+    "reply": "human"
+   }
+  ],
+  "expected": {
+   "outcome": "transferred",
+   "reason": "human",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "general"
+    }
+   ]
+  }
+ }
+]

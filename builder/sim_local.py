@@ -247,13 +247,19 @@ class Bank:
             self.fail[tool] -= 1
             return {"ok": False, "error": "service unavailable, nothing was recorded"}
         if tool == "verify_identity":
-            right = self.case["identity"].get(a.get("field")) == a.get("answer")
+            want = str(self.case["identity"].get(a.get("field")) or "")
+            right = want == a.get("answer")
+            need = len(self.case["identity"])
+            mx = int(((self.spec.get("identity") or {}).get("max_wrong_total")) or 3)
+            # a case's swap_hint: the right date with day and month swapped gets that hint and is not a wrong answer
+            if self.case.get("swap_hint") and not right and len(want) == 10 and want[5:7] != want[8:10] \
+                    and a.get("answer") == want[:5] + want[8:10] + "-" + want[5:7]:
+                return {"ok": True, "verified": False, "hint": self.case["swap_hint"], "wrong_answers_left": max(0, mx - self.wrong),
+                        "all_verified": False}
             if right:
                 self.ok.add(a["field"])
             else:
                 self.wrong += 1
-            need = len(self.case["identity"])
-            mx = int(((self.spec.get("identity") or {}).get("max_wrong_total")) or 3)
             return {"ok": True, "verified": right, "wrong_answers_left": max(0, mx - self.wrong), "all_verified": len(self.ok) >= need}
         if tool == "get_account":
             if len(self.ok) < len(self.case["identity"]):

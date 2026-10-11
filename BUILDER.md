@@ -89,3 +89,6 @@ python3 tools/run_cases.py <agent_id> --brief A [--reps 3] [--cases tests/realis
 `tests/variants/` holds test briefs that are not hackathon briefs (renamed fields and enums; raw material with a memo
 that changes the policy, as a folder of files and, in `v4`, as one Markdown file whose parts are not in date order),
 `tests/calendar-cases.json` holds Brief A cases on other calendar days.
+`tests/local-gap-cases.json` holds the brief rules no other case reaches (outcomes such as wrong number, deceased,
+no callback, dispute, a save that fails twice, the day-and-month hint; Brief B's notes and closing), for `sim_local.py`.
+`tests/platform-gap-cases.json` holds Brief A customers for those outcomes on the platform, on the practice bank's data.
