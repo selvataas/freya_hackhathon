@@ -50,6 +50,12 @@ The workspace holds at most 10 workflows. Today: Base (brief-a), brief-b, spike.
 
 ## 1. Put the briefs in place
 
+**After 20:00 Istanbul (17:00 UTC), check the FAQ tab of https://www.freyavoice.ai/hackathon** before the first build,
+and again before submitting. The organisers answer questions there. Read the answers, but **never write a FAQ
+clarification into the builder's code or prompts**: like the briefs themselves, it is about the final briefs, and
+nothing from them may go into the builder. A FAQ answer can change how we run the steps of this runbook, never what the
+builder contains.
+
 One folder per final brief under `final/`. The tool API file goes next to the brief, never inside a brief folder
 (a brief folder is read whole, every file as brief text).
 
@@ -268,6 +274,7 @@ and without touching the workflow on Freya.
 - Do not edit a workflow on the platform, in the dashboard or with a hand-made PUT.
 - Do not change `freya.py`, `AGENT_LLM` or the agent model.
 - Do not turn on ask_client (`--ask-client`, `CLIENT_MODE`) for a final build.
+- Do not write a FAQ clarification into the builder's code or prompts.
 - Do not commit `env.sh`, `.env` or a key. `git status` before every commit.
 - Do not submit a build that read its spec from the cache (`spec_cache_hit` in its trace). Submitted builds run with `--no-cache`.
 - Do not submit a workflow and a trace from different runs.
