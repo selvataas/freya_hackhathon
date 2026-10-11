@@ -174,13 +174,27 @@ def flat(x, prefix):
     else:
         lines.append(prefix + str(x))
     return lines
+def natural(k):
+    return [int(p) if p.isdigit() else p for p in k.split(".")]
 for name in NAMES:
     raw = vars.get("start_" + name)
     try:
         data = json.loads(raw) if isinstance(raw, str) else raw
     except Exception:
         data = raw
-    vars["start_" + name + "_text"] = "\\n".join(flat(data, "")) if data not in (None, "") else "no answer: call the tool yourself"
+    if data not in (None, "") and not isinstance(data, str):
+        text = "\\n".join(flat(data, ""))
+    else:
+        # the engine also writes every result into the variable table flattened with dots: read it from there
+        text = ""
+        for pre in ("start_" + name + "_response.data.", name + "_response.data."):
+            keys = sorted([k for k in vars.keys() if isinstance(k, str) and k.startswith(pre)], key=natural)
+            if keys:
+                text = "\\n".join(k[len(pre):] + ": " + str(vars.get(k)) for k in keys)
+                break
+        if not text and isinstance(data, str) and data:
+            text = data
+    vars["start_" + name + "_text"] = text or "no answer: call the tool yourself"
 '''
 
 
