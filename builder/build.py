@@ -1,19 +1,22 @@
 """Build a Freya phone agent from a bank's brief and its tool API.
 
     python3 builder/build.py <brief>... <openapi.json> [--no-cache] [--test A|B] [--slot NAME] [--dry]
+    python3 builder/build.py <case_folder> <mock_url> [...]
 
-The last positional argument is the tool API. A brief may be a folder: its files are read in name order.
+The last positional argument is the tool API, or the address of the mock of the bank's services: then the service
+contract is read from the case folder and every tool calls the mock. A brief may be a folder: its files are read in
+name order, sub-folders too (.md and text as they are, .docx and .xlsx with the standard library, .pdf by the model).
 Several briefs are read in order (a later brief builds on the earlier ones). The slot (the workflow this build
 updates) is the last brief's file name without extension, or the folder name.
 """
-import argparse, json, os, pathlib, subprocess, sys, time
+import argparse, json, os, pathlib, re, subprocess, sys, time
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 
 sys.path.insert(0, str(HERE)); sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "tools"))
 import freya
-import ask_client, openapi_tools, platform_calls, render, selftest
+import ask_client, documents, openapi_tools, platform_calls, render, selftest
 from extract import extract, check_verbatim, MODEL, EFFORT
 from spec_schema import normalize
 from trace import Trace
@@ -73,16 +76,20 @@ def main():
     if len(a.paths) < 2:
         sys.exit(__doc__)
     brief_paths, api_path = a.paths[:-1], a.paths[-1]
+    mock_url = api_path if re.match(r"^https?://", api_path) else None
     slot = a.slot or slot_name(brief_paths)
     trace = Trace(str(ROOT / "traces" / f"{time.strftime('%Y%m%d-%H%M%S')}-{slot}.jsonl"))
     warnings = []
     warn = lambda m: (warnings.append(m), trace.event("warning", message=m))
-    trace.event("start", briefs=brief_paths, tool_api=api_path, slot=slot, builder_model=MODEL, effort=EFFORT, agent_llm=freya.AGENT_LLM,
+    trace.event("start", briefs=brief_paths, tool_api=None if mock_url else api_path, mock_url=mock_url, slot=slot, builder_model=MODEL, effort=EFFORT, agent_llm=freya.AGENT_LLM,
                 **git_state())
     try:
-        briefs = read_briefs(brief_paths)
+        docs = documents.read(brief_paths, trace, allow_llm=not a.no_llm)
+        if mock_url:
+            api_path = documents.contract(docs, trace, allow_llm=not a.no_llm)
+        briefs = [(n, t) for n, t, p in docs if p.resolve() != pathlib.Path(api_path).resolve()]
         api_text = pathlib.Path(api_path).read_text()
-        _, tools = openapi_tools.load(api_path)
+        _, tools = openapi_tools.load(api_path, base=mock_url)
         trace.event("tools", names=sorted(tools))
         raw, info = extract(briefs, api_text, trace, use_cache=not a.no_cache, allow_llm=not a.no_llm)
         trace.event("spec", **info)

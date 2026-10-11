@@ -25,10 +25,11 @@ def _props(api, schema):
     return out
 
 
-def load(path):
+def load(path, base=None):
+    """base, when given (the mock's address), replaces the server address of the API file."""
     api = json.load(open(path))
     servers = api.get("servers") or [{}]
-    base = (servers[0].get("url") or "").rstrip("/")
+    base = (base or servers[0].get("url") or "").rstrip("/")
     tools = {}
     for path_, ops in (api.get("paths") or {}).items():
         for method, op in ops.items():
