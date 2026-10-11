@@ -5,6 +5,8 @@
 Each script turn is what the extraction model would produce for one customer message.
 The fake bank names its fields as the spec maps them, so a brief whose tool API renames fields works too.
 A case file holds cases in the public-test-set form plus a "script" list; their products carry their own ids.
+A case with a "spec" runs only against a spec whose path contains it; the built-in cases name the spec of their
+brief (brief-a, brief-b). Case ids on the command line run whatever their spec.
 """
 import copy, json, pathlib, sys
 
@@ -191,6 +193,14 @@ if "PUB-07" in CASES:
 # PUB-06c: the floor on Friday is refused, attempt 2 of the late band offers the floor on the deadline
 if "PUB-06" in CASES:
     CASES["PUB-06c"] = dict(CASES["PUB-06"], id="PUB-06c", expected=dict(CASES["PUB-06"]["expected"], promises=[{"product_id": "p1", "amount": 637.5, "date": "2026-10-23"}]))
+# each built-in case runs against the spec of its own brief; R-multiA tests several products under a spec without
+# multi-product rules, so it belongs to Brief A although its customer comes from Brief B
+for _k, _c in CASES.items():
+    if _c.get("brief"):
+        _c["spec"] = "brief-" + str(_c["brief"]).lower()
+for _k in ("R-multiA", "R-multiA2"):
+    if _k in CASES:
+        CASES[_k]["spec"] = "brief-a"
 
 
 class Bank:
@@ -413,6 +423,6 @@ if __name__ == "__main__":
                 continue
             CASES[c["id"]] = c
             SCRIPTS[c["id"]] = c["script"]
-    ids = args[1:] or sorted(SCRIPTS)
+    ids = args[1:] or sorted(i for i in SCRIPTS if not CASES[i].get("spec") or CASES[i]["spec"] in args[0])
     ok = sum(run_case(spec, i, "-v" in sys.argv) for i in ids)
     print(f"\n{ok} / {len(ids)} passed locally")
