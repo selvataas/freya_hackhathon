@@ -1,0 +1,48 @@
+{
+ "openapi": "3.0.0",
+ "info": {"title": "Patiler Veteriner Kliniği randevu hizmetleri", "version": "1"},
+ "servers": [{"url": "https://randevu.example.invalid"}],
+ "paths": {
+  "/owners/{phone}/appointments": {
+   "get": {
+    "operationId": "find_appointments",
+    "summary": "Arayanın yaklaşan randevuları.",
+    "parameters": [{"name": "phone", "in": "path", "required": true, "schema": {"type": "string"}, "description": "Arayanın telefon numarası."}],
+    "responses": {"200": {"content": {"application/json": {"schema": {"type": "object", "properties": {
+      "ok": {"type": "boolean"},
+      "appointments": {"type": "array", "items": {"type": "object", "properties": {
+        "appointment_id": {"type": "string"}, "pet_name": {"type": "string"}, "service": {"type": "string", "enum": ["muayene", "asi", "tirnak_kesimi"]},
+        "date": {"type": "string"}, "time": {"type": "string"}}}}}}}}}}
+   }
+  },
+  "/slots/free": {
+   "post": {
+    "operationId": "free_slots",
+    "summary": "Bir gün için boş saatler.",
+    "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["date", "service"], "properties": {
+      "date": {"type": "string", "description": "YYYY-MM-DD"},
+      "service": {"type": "string", "enum": ["muayene", "asi", "tirnak_kesimi"]}}}}}},
+    "responses": {"200": {"content": {"application/json": {"schema": {"type": "object", "properties": {
+      "ok": {"type": "boolean"}, "slots": {"type": "array", "items": {"type": "string"}}}}}}}}
+   }
+  },
+  "/appointments/move": {
+   "post": {
+    "operationId": "move_appointment",
+    "summary": "Randevuyu yeni gün ve saate taşır.",
+    "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["appointment_id", "new_date", "new_time"], "properties": {
+      "appointment_id": {"type": "string"}, "new_date": {"type": "string", "description": "YYYY-MM-DD"}, "new_time": {"type": "string", "description": "HH:MM"}}}}}},
+    "responses": {"200": {"content": {"application/json": {"schema": {"type": "object", "properties": {"ok": {"type": "boolean"}, "error": {"type": "string"}}}}}}}
+   }
+  },
+  "/appointments/cancel": {
+   "post": {
+    "operationId": "cancel_appointment",
+    "summary": "Randevuyu iptal eder.",
+    "requestBody": {"content": {"application/json": {"schema": {"type": "object", "required": ["appointment_id", "reason"], "properties": {
+      "appointment_id": {"type": "string"}, "reason": {"type": "string"}}}}}},
+    "responses": {"200": {"content": {"application/json": {"schema": {"type": "object", "properties": {"ok": {"type": "boolean"}, "error": {"type": "string"}}}}}}}
+   }
+  }
+ }
+}

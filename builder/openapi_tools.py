@@ -38,6 +38,13 @@ def load(path, base=None):
             name = op.get("operationId") or path_.strip("/").replace("/", "_")
             body = (((op.get("requestBody") or {}).get("content") or {}).get("application/json") or {}).get("schema") or {}
             resp = ((((op.get("responses") or {}).get("200") or {}).get("content") or {}).get("application/json") or {}).get("schema") or {}
-            tools[name] = {"name": name, "url": base + path_, "method": method.upper(), "summary": op.get("summary") or "",
-                           "fields": _props(api, body), "response": _props(api, resp)}
+            params = []
+            for prm in (op.get("parameters") or []) + (ops.get("parameters") or [] if isinstance(ops.get("parameters"), list) else []):
+                prm = _resolve(api, prm)
+                if prm.get("in") in ("path", "query") and prm.get("name"):
+                    sch = _resolve(api, prm.get("schema") or {})
+                    params.append({"name": prm["name"], "in": prm["in"], "required": bool(prm.get("required")), "type": sch.get("type") or "string",
+                                   "enum": sch.get("enum") or [], "description": prm.get("description") or ""})
+            tools[name] = {"name": name, "url": base + path_, "method": method.upper(), "summary": op.get("summary") or op.get("description") or "",
+                           "fields": _props(api, body), "response": _props(api, resp), "params": params}
     return api, tools

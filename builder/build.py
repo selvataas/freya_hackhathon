@@ -16,7 +16,7 @@ ROOT = HERE.parent
 
 sys.path.insert(0, str(HERE)); sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "tools"))
 import freya
-import ask_client, documents, openapi_tools, platform_calls, render, selftest
+import ask_client, documents, generic, openapi_tools, platform_calls, render, selftest
 from extract import extract, check_verbatim, MODEL, EFFORT
 from spec_schema import normalize
 from trace import Trace
@@ -91,39 +91,56 @@ def main():
         api_text = pathlib.Path(api_path).read_text()
         _, tools = openapi_tools.load(api_path, base=mock_url)
         trace.event("tools", names=sorted(tools))
-        raw, info = extract(briefs, api_text, trace, use_cache=not a.no_cache, allow_llm=not a.no_llm)
-        trace.event("spec", **info)
-        if ask_client.enabled(a.ask_client):
-            transport = ask_client.FileTransport(a.client_answers)
-            why = ask_client.refusal(transport, testing=bool(a.test))
-            if why:
-                trace.event("ask_client disabled", reason=why)
-                print(f"ask_client disabled: {why}", file=sys.stderr)
-            else:
-                raw = ask_client.run(raw, briefs, transport, trace, allow_llm=not a.no_llm, use_cache=not a.no_cache)
-        spec = normalize(raw, tools, warn)
-        check_verbatim(spec, briefs, warn)
-        spec, neutral = render.neutral_phrases(spec)
-        if neutral:
-            trace.event("phrases_neutralized", about="success words removed from non-verbatim lines said before any result", changes=neutral)
-        spec, lines = render.customer_lines(spec)
-        if lines:
-            trace.event("lines_for_customer", about="lines written as instructions to the agent, turned into lines for the customer", changes=lines)
-        wf = render.render(spec, tools)
-        kinds = {}
-        for n in wf["nodes"].values():
-            kinds[n["node_type"]] = kinds.get(n["node_type"], 0) + 1
-        bank_tools = sorted(set([a["function"]["name"] for n in wf["nodes"].values() for a in n.get("pre_actions", []) if a["function"]["handler"] == "__function__:api_call"]
-                                + [t["function"]["name"] for t in wf.get("tools", [])]))
-        trace.event("rendered", nodes=len(wf["nodes"]), node_types=kinds, tools=len(bank_tools), tool_names=bank_tools,
-                    custom_situations=len(spec.get("custom_situations") or []), unplaced_rules=len(spec.get("unplaced_rules") or []))
-        t0 = time.time()
-        st = selftest.run(spec)
-        ok = sum(r["pass"] for r in st)
-        trace.event("selftest", about="local scenarios from the spec, fake bank, no model or platform call", passed=ok, total=len(st),
-                    seconds=round(time.time() - t0, 1), results=[{"name": r["name"], "pass": r["pass"], "problems": r["problems"][:3]} for r in st])
-        if ok < len(st):
-            warn(f"self-test: {len(st) - ok} of {len(st)} scenarios failed")
+        if not generic.fits_template(tools):
+            # a call the collections template does not fit: the generic path
+            trace.event("path", mode="generic", about="the tool API lacks the collections template's tools; one dialogue step holds the API's operations")
+            spec, info = generic.extract(briefs, api_text, tools, trace, use_cache=not a.no_cache, allow_llm=not a.no_llm)
+            trace.event("spec", **info)
+            wf = generic.render(spec, tools)
+            main = wf["nodes"]["main"]
+            trace.event("rendered", nodes=len(wf["nodes"]), node_types={"code": 1, "conversation": 1}, tools=len(main["tools"]),
+                        tool_names=[t["function"]["name"] for t in main["tools"]], instructions_chars=len(main["task_message"]))
+            t0 = time.time()
+            st = generic.check(spec, tools, wf)
+            ok = sum(r["pass"] for r in st)
+            trace.event("selftest", about="the generic path's checks of the spec and the workflow, no model or platform call", passed=ok, total=len(st),
+                        seconds=round(time.time() - t0, 1), results=st)
+            if ok < len(st):
+                warn(f"self-test: {len(st) - ok} of {len(st)} checks failed")
+        else:
+            raw, info = extract(briefs, api_text, trace, use_cache=not a.no_cache, allow_llm=not a.no_llm)
+            trace.event("spec", **info)
+            if ask_client.enabled(a.ask_client):
+                transport = ask_client.FileTransport(a.client_answers)
+                why = ask_client.refusal(transport, testing=bool(a.test))
+                if why:
+                    trace.event("ask_client disabled", reason=why)
+                    print(f"ask_client disabled: {why}", file=sys.stderr)
+                else:
+                    raw = ask_client.run(raw, briefs, transport, trace, allow_llm=not a.no_llm, use_cache=not a.no_cache)
+            spec = normalize(raw, tools, warn)
+            check_verbatim(spec, briefs, warn)
+            spec, neutral = render.neutral_phrases(spec)
+            if neutral:
+                trace.event("phrases_neutralized", about="success words removed from non-verbatim lines said before any result", changes=neutral)
+            spec, lines = render.customer_lines(spec)
+            if lines:
+                trace.event("lines_for_customer", about="lines written as instructions to the agent, turned into lines for the customer", changes=lines)
+            wf = render.render(spec, tools)
+            kinds = {}
+            for n in wf["nodes"].values():
+                kinds[n["node_type"]] = kinds.get(n["node_type"], 0) + 1
+            bank_tools = sorted(set([a["function"]["name"] for n in wf["nodes"].values() for a in n.get("pre_actions", []) if a["function"]["handler"] == "__function__:api_call"]
+                                    + [t["function"]["name"] for t in wf.get("tools", [])]))
+            trace.event("rendered", nodes=len(wf["nodes"]), node_types=kinds, tools=len(bank_tools), tool_names=bank_tools,
+                        custom_situations=len(spec.get("custom_situations") or []), unplaced_rules=len(spec.get("unplaced_rules") or []))
+            t0 = time.time()
+            st = selftest.run(spec)
+            ok = sum(r["pass"] for r in st)
+            trace.event("selftest", about="local scenarios from the spec, fake bank, no model or platform call", passed=ok, total=len(st),
+                        seconds=round(time.time() - t0, 1), results=[{"name": r["name"], "pass": r["pass"], "problems": r["problems"][:3]} for r in st])
+            if ok < len(st):
+                warn(f"self-test: {len(st) - ok} of {len(st)} scenarios failed")
         out = ROOT / "out"
         out.mkdir(exist_ok=True)
         (out / f"{slot}.spec.json").write_text(json.dumps(spec, indent=1))
