@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 
 CACHE = pathlib.Path(__file__).resolve().parent.parent / "cache"
 TEXT = {".md", ".markdown", ".txt", ".csv", ".tsv", ".json", ".yaml", ".yml", ".xml", ".html", ".htm", ".svg", ".mmd"}
+MAX_BYTES = 300_000  # a file larger than this is named in the trace and not read
 IMAGES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 X = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
@@ -227,6 +228,10 @@ def read(paths, trace, allow_llm=True):
     docs, skipped = [], []
     for name, f in files_of(paths):
         ext = f.suffix.lower()
+        if (ext in TEXT or ext in (".xlsx", ".xlsm")) and f.stat().st_size > MAX_BYTES:
+            # a large data file (a test data set, an export) is not a document to read: it would not fit the model's input
+            skipped.append({"file": name, "why": f"larger than {MAX_BYTES // 1000} kB: not read into the model's input"})
+            continue
         try:
             if ext in TEXT:
                 docs.append((name, f.read_text(errors="replace"), f))
