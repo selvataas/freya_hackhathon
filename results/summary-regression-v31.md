@@ -1,6 +1,6 @@
 # Test summary: regression of brief-a v31 / brief-b v20
 
-Written 2026-10-11 17:05 from `results/reg-*.json`. Agents: brief-a v31, brief-b v20, built from commit `995e2b1` (the
+Written 2026-10-11 16:59 from `results/reg-*.json`. Agents: brief-a v31, brief-b v20, built from commit `995e2b1` (the
 four fixes: corrections, numbers said again, callback days without a time, spec lines written as instructions). The
 runs went from 15:08 to 16:57 on an unstable platform (503/504 from 12:20 to 15:08). A case counts only when all 3
 runs pass. A failure is **platform** when the call did not run, the judge gave no verdict, a tool call did not
@@ -33,7 +33,7 @@ complete or the agent was silent more than 20 s; **simulator** when the simulate
   zero." The extraction also gave a day-and-month hint (`id_iso = --10-30`) from the wedding, and the runtime added it
   to the answer of the phone question: 4410 + 30, last four digits **1030**, a wrong answer. **Agent**, but not new:
   the day-and-month hint has been used for every question since commit `81376ba` (10 October), so v30 has it too.
-  The fix (use the hint only for a date question) is after 17:00 and was not made.
+  It was found at 16:58, at the 17:00 code freeze; the fix (use the hint only for a date question) was not made.
 
 ## Compared with v30 / v19 (the same runs earlier today and on 10 October)
 
