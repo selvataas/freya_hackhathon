@@ -1,0 +1,15 @@
+{
+ "team": "Fides",
+ "members": [
+  {
+   "name": "Selva Taş",
+   "email": "selvataas@gmail.com"
+  }
+ ],
+ "repo": "https://github.com/selvataas/freya_hackhathon",
+ "commit": "c92e28060f7b6190a2163933eed90c990d545164",
+ "run_command": "python3 builder/build.py {case_folder} {mock_url}",
+ "workflow": "submission/final.workflow.json",
+ "trace": "traces/final.log",
+ "mock_url": "https://fides-mock.fides-freya.workers.dev"
+}
