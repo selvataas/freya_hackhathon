@@ -72,7 +72,8 @@ extraction; `--no-llm` guarantees no model call.
 
 ## Trace
 
-Every run writes `traces/<time>-<slot>.jsonl`, one JSON object per line: `start`, the tools, every `model_call` (model,
+Every run writes `traces/<time>-<slot>.jsonl`, one JSON object per line: `start` (with `git_commit`, the commit the
+builder runs from, `git_dirty`, whether tracked files had uncommitted changes, and the untracked files), the tools, every `model_call` (model,
 purpose, tokens, seconds), the spec comparison, warnings, `rendered` (number of steps and tools), `selftest`,
 `dry_run`, `saved` (workflow and agent id), and `end` (build seconds). API keys and the team key are masked before
 anything is written.

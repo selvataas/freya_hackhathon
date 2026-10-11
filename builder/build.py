@@ -34,6 +34,19 @@ def slot_name(paths):
     return p.name if p.is_dir() else p.stem
 
 
+def git_state():
+    """The commit the builder runs from and whether tracked files differ from it; untracked files are listed apart.
+    Never stops the build: without git the fields are None."""
+    try:
+        git = lambda *a: subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True, timeout=10, check=True).stdout
+        changed = [l[3:] for l in git("status", "--porcelain", "--untracked-files=no").splitlines()]
+        untracked = [l[3:] for l in git("status", "--porcelain", "--untracked-files=all").splitlines() if l.startswith("??")]
+        return {"git_commit": git("rev-parse", "HEAD").strip(), "git_dirty": bool(changed), "git_changed": changed[:20],
+                "git_untracked": untracked[:20]}
+    except Exception as e:
+        return {"git_commit": None, "git_dirty": None, "git_error": repr(e)[:200]}
+
+
 def rename(workflow_id, name, wf, trace):
     """Keep the workflow's name equal to its slot. A failure here is logged and never stops the build."""
     try:
@@ -64,7 +77,8 @@ def main():
     trace = Trace(str(ROOT / "traces" / f"{time.strftime('%Y%m%d-%H%M%S')}-{slot}.jsonl"))
     warnings = []
     warn = lambda m: (warnings.append(m), trace.event("warning", message=m))
-    trace.event("start", briefs=brief_paths, tool_api=api_path, slot=slot, builder_model=MODEL, effort=EFFORT, agent_llm=freya.AGENT_LLM)
+    trace.event("start", briefs=brief_paths, tool_api=api_path, slot=slot, builder_model=MODEL, effort=EFFORT, agent_llm=freya.AGENT_LLM,
+                **git_state())
     try:
         briefs = read_briefs(brief_paths)
         api_text = pathlib.Path(api_path).read_text()

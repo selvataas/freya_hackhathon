@@ -140,6 +140,9 @@ T="$(ls -t traces/2*-hidden-N.jsonl | head -1)"   # N = 1 or 2
 4. The trace has: `start`, every `model_call` (model, purpose, tokens), `spec_compare`, `rendered` (nodes, tools),
    `selftest`, `dry_run` (valid), `saved` (workflow and agent id), `end` (build_seconds).
    It has no `spec_cache_hit`: a submitted build reads its spec from the brief, with `--no-cache`.
+   `start` names the code it ran from: `git_commit` is the commit we pushed before the build (`git rev-parse HEAD`),
+   `git_dirty` is `false` and `git_untracked` lists only this brief, its tool API file and the log. `git_dirty: true`
+   means the build ran on uncommitted code: commit and push, then build again with `--no-cache`.
 5. **ask_client is never turned on in the final**: no `--ask-client`, no `CLIENT_MODE`. The trace must have no
    `client_` event:
 
@@ -217,6 +220,9 @@ git commit -m "Final build: hidden-$N"
 git push
 git ls-files traces/hidden-1.log traces/hidden-1.jsonl traces/hidden-2.log traces/hidden-2.jsonl   # each submitted brief's two trace files must be listed
 git rev-parse HEAD        # the commit we submit
+# the trace names the commit the build ran from; the submitted commit adds only the brief, the export and the traces
+B="$(python3 -c "import json,sys; print(json.loads(open(sys.argv[1]).readline())['git_commit'])" traces/hidden-$N.jsonl)"
+git diff --stat "$B" HEAD -- builder freya.py tools   # must print nothing: same builder code
 ```
 
 Then fill `docs/submission-template.json` (copy it to `submission/submission.json`) and send the form.
