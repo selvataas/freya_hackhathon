@@ -8,7 +8,7 @@ API's operations as tools. Nothing here knows a brief.
 import hashlib, json, pathlib, re, time
 
 CACHE = pathlib.Path(__file__).resolve().parent.parent / "cache"
-GENERIC_VERSION = "2"
+GENERIC_VERSION = "3"
 TEMPLATE_TOOLS = {"verify_identity", "get_account", "create_promise", "close_call"}
 
 
@@ -41,7 +41,9 @@ SCHEMA = {
         "start_tools": {"type": "array", "items": {"type": "string"},
                         "description": "Read-only lookups whose inputs all come from the call's variables and that the agent needs before "
                                        "anything else; the program runs them before the conversation starts. Never an operation that changes anything."},
-        "closing_line": {"type": "string", "description": "The sentence that ends every call, in the call's language."},
+        "closing_line": {"type": "string", "description": "The sentence the program says to end the call when the customer has nothing else, in the call's language."},
+        "end_lines": {"type": "array", "items": {"type": "string"},
+                      "description": "Every sentence after which the call is over (the closing, every hand-over, ending on silence), word for word in the call's language."},
         "goodbye_words": {"type": "array", "items": {"type": "string"}, "description": "Short words or phrases that close a call in the call's language."},
     },
 }
@@ -63,8 +65,9 @@ and a calendar of the coming days written from the call's date.
 - "start_tools": the lookups the agent always needs first, when their inputs are all call variables (for example
   reading the caller's records by an id the call starts with). Their answers are in the agent's briefing from the
   first turn. Never list an operation that changes anything.
-- The program says the closing sentence and ends the call when the customer has nothing else; the instructions must
-  not tell the agent to say it.
+- "end_lines": every sentence after which the call is over, word for word. The call ends when the agent says one of
+  them; the instructions say when to say which. When the customer simply has nothing else, the program says
+  "closing_line" and ends the call.
 - Every text the agent says is said to the customer, in the second person, never an instruction to the agent."""
 
 
@@ -223,7 +226,8 @@ def _all_from_variables(t, entry, call_vars):
 
 def _end_call(spec):
     closing = (spec.get("closing_line") or "").strip()
-    core = re.escape(closing.rstrip(".!?")) if closing else "goodbye"
+    lines = [x.strip() for x in (spec.get("end_lines") or []) + [closing] if isinstance(x, str) and x.strip()]
+    core = "|".join(re.escape(x.rstrip(".!?")) for x in dict.fromkeys(lines)) or "goodbye"
     words = "|".join(re.escape(w.strip()) for w in spec.get("goodbye_words") or [] if w.strip()) or "goodbye|bye"
     return {"type": "function", "config": {"timeoutMs": 10000},
             "function": {"name": "end_call", "handler": "__function__:end_call",
@@ -231,7 +235,7 @@ def _end_call(spec):
                              "message_mode": {"type": "string", "default": "none"}, "interruptible": {"type": "boolean", "default": True},
                              "trigger_pattern": {"type": "string", "default": core}, "trigger_timeout": {"type": "number", "default": 3},
                              "trigger_pattern_both": {"type": "string", "default": words}}},
-                         "description": "Ends the call. You normally do NOT call this: the closing sentence ends the call by itself. "
+                         "description": "Ends the call. You normally do NOT call this: an ending sentence ends the call by itself. "
                                         "Call it without any text only if the customer speaks after your closing sentence."}}
 
 
@@ -263,8 +267,10 @@ def render(spec, tools):
     if starts:
         task += "\n\nLooked up for you when the call started (use these answers; call the tool again only when you need something new):\n" + \
             "\n".join(f"- {n}, one line per record:\n{{{{start_{n}_text}}}}" for n in starts)
-    task += ("\n\nWhen the customer has nothing else, the program says the closing sentence and ends the call: do not say goodbye "
-             "yourself, ask whether there is anything else instead.")
+    ends = [x.strip() for x in spec.get("end_lines") or [] if isinstance(x, str) and x.strip()]
+    task += ("\n\nThe call ends when you say one of these sentences, word for word; say nothing after it:\n" + "\n".join(f'- "{x}"' for x in ends)
+             if ends else "") + \
+        (f"\nWhen the customer simply has nothing else, the program says \"{closing}\" and ends the call." if closing else "")
     done = R._ex("done", "string", "yes = the customer's LAST message says they need nothing else, says goodbye or thanks to close the call, "
                  "or refuses to go on; no = anything else.", ["yes", "no"])
     main = {"name": "main", "node_type": "conversation", "position": {"x": 300, "y": 0},
