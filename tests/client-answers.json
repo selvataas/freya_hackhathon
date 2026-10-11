@@ -1,0 +1,10 @@
+{
+  "default": "No further information. Follow the brief as written.",
+  "answers": {
+    "standard segment": "For the standard segment the latest promise date is the 7th working day after today, as in the mail of 9 November.",
+    "promise date": "For the standard segment the latest promise date is the 7th working day after today, as in the mail of 9 November.",
+    "working day": "For the standard segment the latest promise date is the 7th working day after today, as in the mail of 9 November.",
+    "callback": "Callbacks are possible from 10:00 to 18:00, both included.",
+    "hardship desk": "The hardship desk is open: offer the transfer."
+  }
+}

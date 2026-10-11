@@ -85,7 +85,7 @@ def _http_messages(body, timeout=900):
     raise last
 
 
-def _complete(system, messages):
+def _complete(system, messages, effort=None):
     """Returns (text, stop_reason, input_tokens, output_tokens). The SDK when it is installed, plain HTTP otherwise."""
     try:
         import anthropic
@@ -94,14 +94,14 @@ def _complete(system, messages):
     if anthropic is not None and hasattr(anthropic, "Anthropic"):
         try:
             client = anthropic.Anthropic(max_retries=3)
-            with client.messages.stream(model=MODEL, max_tokens=64000, system=system, output_config={"effort": EFFORT},
+            with client.messages.stream(model=MODEL, max_tokens=64000, system=system, output_config={"effort": effort or EFFORT},
                                         messages=messages) as stream:
                 msg = stream.get_final_message()
             text = "".join(b.text for b in msg.content if b.type == "text")
             return text, msg.stop_reason, msg.usage.input_tokens, msg.usage.output_tokens
         except TypeError:
             pass  # an old SDK without output_config: use plain HTTP
-    r = _http_messages({"model": MODEL, "max_tokens": 32000, "system": system, "output_config": {"effort": EFFORT}, "messages": messages})
+    r = _http_messages({"model": MODEL, "max_tokens": 32000, "system": system, "output_config": {"effort": effort or EFFORT}, "messages": messages})
     text = "".join(b.get("text", "") for b in r.get("content") or [] if b.get("type") == "text")
     u = r.get("usage") or {}
     return text, r.get("stop_reason"), u.get("input_tokens"), u.get("output_tokens")

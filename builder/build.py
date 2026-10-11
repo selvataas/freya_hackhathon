@@ -13,7 +13,7 @@ ROOT = HERE.parent
 
 sys.path.insert(0, str(HERE)); sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "tools"))
 import freya
-import openapi_tools, render, selftest
+import ask_client, openapi_tools, render, selftest
 from extract import extract, check_verbatim, MODEL, EFFORT
 from spec_schema import normalize
 from trace import Trace
@@ -53,6 +53,9 @@ def main():
     ap.add_argument("--slot")
     ap.add_argument("--test", help="run the practice customers of this brief letter after the build")
     ap.add_argument("--dry", action="store_true", help="build and validate, do not save to Freya")
+    ap.add_argument("--ask-client", action="store_true", help="ask the client about unclear points (also CLIENT_MODE=1); off by default")
+    ap.add_argument("--client-answers", default=os.environ.get("CLIENT_ANSWERS", str(ROOT / "tests" / "client-answers.json")),
+                    help="the file transport's fixed answers")
     a = ap.parse_args()
     if len(a.paths) < 2:
         sys.exit(__doc__)
@@ -69,6 +72,8 @@ def main():
         trace.event("tools", names=sorted(tools))
         raw, info = extract(briefs, api_text, trace, use_cache=not a.no_cache, allow_llm=not a.no_llm)
         trace.event("spec", **info)
+        if ask_client.enabled(a.ask_client):
+            raw = ask_client.run(raw, briefs, ask_client.FileTransport(a.client_answers), trace, allow_llm=not a.no_llm, use_cache=not a.no_cache)
         spec = normalize(raw, tools, warn)
         check_verbatim(spec, briefs, warn)
         spec, neutral = render.neutral_phrases(spec)
