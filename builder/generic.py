@@ -299,10 +299,16 @@ def _all_from_variables(t, entry, call_vars, consts=None):
     return all(ok(n) for n in names)
 
 
-END_CODE = '''v = vars.get("end_the_call_args.line") or vars.get("line") or ""
-v = str(v).strip()
+END_CODE = '''v = str(vars.get("end_the_call_args.line") or vars.get("line") or "").strip()
+b = str(vars.get("end_the_call_args.say_before") or vars.get("say_before") or "").strip()
+if b.startswith("{" + "{"):
+    b = ""
+if v.startswith("{" + "{"):
+    v = ""
 if v:
     vars["ending"] = v
+if b and b not in str(vars.get("ending") or ""):
+    vars["ending"] = b + " " + str(vars.get("ending") or "")
 vars["end_now"] = "yes"
 '''
 
@@ -313,9 +319,12 @@ def _end_tool(lines):
     return {"type": "function", "config": {"timeoutMs": 10000},
             "function": {"name": "end_the_call", "handler": "__function__:code_exec",
                          "description": "Ends the call. Call this instead of saying an ending sentence: give the ending sentence that fits as "
-                                        "'line'; the program says it and hangs up.",
-                         "parameters": {"type": "object", "required": ["line"], "properties": {
+                                        "'line', and in 'say_before' everything the customer must still hear before it, above all the result of an "
+                                        "action you just did (what was changed or sent), word for word as the instructions give it. The program says "
+                                        "say_before, then the ending sentence, and hangs up.",
+                         "parameters": {"type": "object", "required": ["say_before", "line"], "properties": {
                              "code": {"type": "string", "default": END_CODE}, "timeout_ms": {"type": "number", "default": 10000},
+                             "say_before": {"type": "string", "description": "What the customer must still hear before the ending sentence (the result of an action just done); empty if nothing."},
                              "line": {"type": "string", "enum": lines, "description": "The ending sentence to say, word for word."}}}}}
 
 
@@ -374,8 +383,9 @@ def render(spec, tools):
         task += "\n\nLooked up for you when the call started (use these answers; call the tool again only when you need something new):\n" + \
             "\n".join(f"- {safe[n]}, one line per record:\n{{{{start_{safe[n]}_text}}}}" for n in starts)
     ends = [x.strip() for x in spec.get("end_lines") or [] if isinstance(x, str) and x.strip()]
-    task += ("\n\nTo end the call, call end_the_call with the ending sentence that fits; do not say it yourself, the program says it and "
-             "hangs up. The ending sentences:\n" + "\n".join(f'- "{x}"' for x in ends) if ends else "") + \
+    task += ("\n\nTo end the call, call end_the_call with the ending sentence that fits and, in say_before, everything the customer must "
+             "still hear first, above all the result of an action you just did; do not say them yourself, the program says them and hangs up. "
+             "Never end right after an action's answer without its result in say_before. The ending sentences:\n" + "\n".join(f'- "{x}"' for x in ends) if ends else "") + \
         (f"\nWhen the customer simply has nothing else, the program says \"{closing}\" and ends the call." if closing else "")
     done = R._ex("done", "string", "yes = the customer's LAST message says they need nothing else, says goodbye or thanks to close the call, "
                  "or refuses to go on; no = anything else.", ["yes", "no"])
