@@ -116,6 +116,9 @@ workspace; a ten-customer run took up to 8 minutes per run on a busy evening). S
    look: one chat turn to see the workflow starts, and, if there is time, a few calls with the practice customers of the
    kit run against the new agent only when the final brief is close enough for their checks to make sense.
 3. Never wait for a platform test before exporting and committing a good build. Export first; test after.
+4. **The chat API skips the setup code step.** `POST /api/v2/chat/message` does not run the workflow's first code step
+   (the setup), as the spike showed. A chat test can therefore show an error even when the agent is right. A chat
+   result alone is never a reason to change the builder. The real assurance is the local self-test.
 
 ## 3. Checks after each build
 
