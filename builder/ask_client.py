@@ -49,15 +49,29 @@ class FileTransport:
         self.answers = data.get("answers") or {}
         self.default = data.get("default") or DEFAULT_ANSWER
 
+    @staticmethod
+    def _main_text(text):
+        """The question without its examples: a key found only in '(...)', 'e.g. ...', 'for example ...' or
+        'such as ...' is a weak match and does not count."""
+        t = (text or "").lower().replace("-", " ")
+        t = re.sub(r"\([^)]*\)", " ", t)
+        t = re.sub(r"\b(e\.g\.|for example|such as)[^.;?!]*", " ", t)
+        return t
+
     def ask(self, question):
         a = self.answers.get(question.get("id")) or self.answers.get(question.get("question"))
-        if a is None:
-            # a key may also be a few words that the question contains
-            for k, v in self.answers.items():
-                if len(k) > 8 and k.lower() in (question.get("question") or "").lower():
-                    a = v
-                    break
-        return a if a is not None else self.default
+        if a is not None:
+            return a
+        # a key may also be a few words the question contains: whole words, at least 8 characters, outside examples
+        text = self._main_text(question.get("question"))
+        hits = {}
+        for k, v in self.answers.items():
+            key = k.lower().replace("-", " ").strip()
+            if len(key) >= 8 and re.search(r"\b" + re.escape(key) + r"s?\b", text):
+                hits[k] = v
+        if len(set(hits.values())) == 1:
+            return next(iter(hits.values()))
+        return self.default  # no match, or several keys pointing to different answers
 
     def fingerprint(self):
         return hashlib.sha256(json.dumps({"a": self.answers, "d": self.default}, sort_keys=True).encode()).hexdigest()[:12]

@@ -77,6 +77,19 @@ def main():
     trace3 = Trace()
     out3 = ask_client.run(copy.deepcopy(spec), [("brief.md", "text")], ask_client.FileTransport(tmp / "none.json"), trace3, llm=None, allow_llm=False, use_cache=False)
     check(out3 == spec, "--no-llm with nothing cached leaves the spec as it is")
+    # keyword matching of the file transport, with the questions the real model asked on 11 October
+    t = transport
+    q = lambda text: {"id": "x", "question": text}
+    check("7th working day" in t.ask(q("For standard-segment customers (1-14 days late), is the latest promise date the 7th working day (9 Nov email), the 12th (25 Oct pilot email) or the 10th (policy CP-7)?")),
+          "several keys with the same answer: that answer (hyphen read as a space)")
+    check("10:00 to 18:00" in t.ask(q("Is a 'callback today' only allowed if the requested time is later than now and before 18:00?")),
+          "an 8-character key ('callback') matches")
+    check(t.ask(q("If a customer in a multi-product call is transferred (e.g. to the hardship desk) after one product already has a recorded promise, what outcome should be recorded?")) == t.default,
+          "a key found only inside an example is a weak match: the default answer")
+    check(t.ask(q("Is the callback window different for the hardship desk?")) == t.default,
+          "two keys pointing to different answers: the default answer")
+    check(t.ask(q("Is the callbacks list kept?")) != t.default, "a plural of the key still matches")
+    check(t.ask(q("Is there a callbackfee?")) == t.default, "a key inside another word does not match")
     shutil.rmtree(tmp)
     print("\nall passed" if ok else "\nSOME FAILED")
     sys.exit(0 if ok else 1)
