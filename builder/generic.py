@@ -135,6 +135,8 @@ WEEKDAYS = {"en": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satu
 # the calendar step: no curly braces next to each other, only json/re/datetime (the platform's rules for code)
 CALENDAR_CODE = '''import re, datetime
 names = NAMES
+vars["ending"] = CLOSING
+vars["end_now"] = "no"
 src = str(vars.get(DATEVAR) or "")
 m = re.match(r"(\\d{4})-(\\d{2})-(\\d{2})", src)
 try:
@@ -238,6 +240,26 @@ def _all_from_variables(t, entry, call_vars):
     return all((mapped.get(n) or (n if n in call_vars else None)) in call_vars for n in names)
 
 
+END_CODE = '''v = vars.get("end_the_call_args.line") or vars.get("line") or ""
+v = str(v).strip()
+if v:
+    vars["ending"] = v
+vars["end_now"] = "yes"
+'''
+
+
+def _end_tool(lines):
+    """The model ends the call by calling this with the ending sentence; a transition on end_now leads to the closing
+    step, which says the sentence and hangs up at once."""
+    return {"type": "function", "config": {"timeoutMs": 10000},
+            "function": {"name": "end_the_call", "handler": "__function__:code_exec",
+                         "description": "Ends the call. Call this instead of saying an ending sentence: give the ending sentence that fits as "
+                                        "'line'; the program says it and hangs up.",
+                         "parameters": {"type": "object", "required": ["line"], "properties": {
+                             "code": {"type": "string", "default": END_CODE}, "timeout_ms": {"type": "number", "default": 10000},
+                             "line": {"type": "string", "enum": lines, "description": "The ending sentence to say, word for word."}}}}}
+
+
 def _end_call(spec):
     closing = (spec.get("closing_line") or "").strip()
     lines = [x.strip() for x in (spec.get("end_lines") or []) + [closing] if isinstance(x, str) and x.strip()]
@@ -275,21 +297,23 @@ def render(spec, tools):
     system = (f"You are the phone assistant of {spec.get('business_name') or 'the business'}. Speak only {lang}: "
               "one or two short sentences per turn, one question at a time. Follow the task of the current step.")
     opening = (spec.get("opening") or "").strip()
-    cal = CALENDAR_CODE.replace("NAMES", json.dumps(names, ensure_ascii=False)).replace("DATEVAR", json.dumps(datevar or "now"))
+    cal = CALENDAR_CODE.replace("NAMES", json.dumps(names, ensure_ascii=False)).replace("DATEVAR", json.dumps(datevar or "now")) \
+        .replace("CLOSING", json.dumps(closing or "."))
     import render as R
     starts = [n for n in spec.get("start_tools") or [] if n in tools and _all_from_variables(tools[n], entries.get(n) or {}, call_vars)]
     if starts:
         task += "\n\nLooked up for you when the call started (use these answers; call the tool again only when you need something new):\n" + \
             "\n".join(f"- {n}, one line per record:\n{{{{start_{n}_text}}}}" for n in starts)
     ends = [x.strip() for x in spec.get("end_lines") or [] if isinstance(x, str) and x.strip()]
-    task += ("\n\nThe call ends when you say one of these sentences, word for word; say nothing after it:\n" + "\n".join(f'- "{x}"' for x in ends)
-             if ends else "") + \
+    task += ("\n\nTo end the call, call end_the_call with the ending sentence that fits; do not say it yourself, the program says it and "
+             "hangs up. The ending sentences:\n" + "\n".join(f'- "{x}"' for x in ends) if ends else "") + \
         (f"\nWhen the customer simply has nothing else, the program says \"{closing}\" and ends the call." if closing else "")
     done = R._ex("done", "string", "yes = the customer's LAST message says they need nothing else, says goodbye or thanks to close the call, "
                  "or refuses to go on; no = anything else.", ["yes", "no"])
     main = {"name": "main", "node_type": "conversation", "position": {"x": 300, "y": 0},
             "on_enter": {"type": "tts", "text": opening} if opening else {"type": "llm"}, "on_enter_first_entry_only": True,
-            "role_message": "", "task_message": task, "tools": api_tools + [_end_call(spec)], "transitions": [R._eq("done", "yes", "bye")],
+            "role_message": "", "task_message": task, "tools": api_tools + ([_end_tool(list(dict.fromkeys(ends + ([closing] if closing else []))))] if ends else []) + [_end_call(spec)],
+            "transitions": [R._eq("end_now", "yes", "bye"), R._eq("done", "yes", "bye")],
             "assertions": [], "passthrough": False, "pre_actions": [], "interruptible": True, "max_node_turns": 80,
             "response_mapping": [], "extraction_schema": [done], "max_turn_transition": None, "truncation_strategy": "keep_all",
             "suppress_tool_results": False, "truncation_window_size": 10, "disable_inactivity_monitor": False,
@@ -327,7 +351,7 @@ def render(spec, tools):
     nodes["bye"] = {"name": "bye", "node_type": "end_call", "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True, "transitions": [],
                     "terminal": {"type": "function", "function": {"name": "call_closed", "handler": "__function__:end_call",
                                  "parameters": {"type": "object", "properties": {"message_mode": {"type": "string", "default": "custom"},
-                                                                                "spoken_message": {"type": "string", "default": closing or "."}}}}}}
+                                                                                "spoken_message": {"type": "string", "default": "{{ending}}"}}}}}}
     return {"nodes": nodes, "tools": [], "global_nodes": {}, "initial_node": "calendar",
             "system_prompt": system, "test_variables": dict((v["name"], v.get("example") or "") for v in variables)}
 

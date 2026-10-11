@@ -36,18 +36,19 @@ def main():
           "the start lookup's path parameter comes from the call variable")
     main = nodes["main"]
     names = [t["function"]["name"] for t in main["tools"]]
-    check(sorted(names) == sorted(list(tools) + ["end_call"]), "every operation is a tool of the conversation, and end_call")
+    check(sorted(names) == sorted(list(tools) + (["end_the_call"] if spec.get("end_lines") else []) + ["end_call"]), "every operation is a tool of the conversation, and the ending tools")
     move = next(t for t in main["tools"] if t["function"]["name"] == "move_appointment")["function"]["parameters"]["properties"]
     check(move["url"]["default"] == "https://mock.example/appointments/move" and move["body"]["properties"]["new_date"]["default"] == "{{new_date}}",
           "a model-filled field has a placeholder of its own name")
-    check(main["transitions"][0]["target_node"] == "bye" and main["extraction_schema"][0]["name"] == "done", "the conversation closes through 'done'")
-    check(nodes["bye"]["terminal"]["function"]["parameters"]["properties"]["spoken_message"]["default"] == spec["closing_line"],
-          "the closing node says the closing line")
+    check([t["target_node"] for t in main["transitions"]] == ["bye", "bye"] and main["extraction_schema"][0]["name"] == "done", "the conversation closes through end_now or 'done'")
+    check(nodes["bye"]["terminal"]["function"]["parameters"]["properties"]["spoken_message"]["default"] == "{{ending}}",
+          "the closing node says the chosen ending")
     check("{{calendar}}" in main["task_message"] and "{{start_find_appointments_text}}" in main["task_message"], "the briefing holds the calendar and the start lookup")
     code = nodes["calendar"]["pre_actions"][0]["function"]["parameters"]["properties"]["code"]["default"]
     env = {"vars": {"now": "2026-11-03T14:20:00+03:00"}}
     exec(code, env)
     cal = env["vars"]["calendar"]
+    check(env["vars"]["ending"] == spec["closing_line"] and env["vars"]["end_now"] == "no", "the calendar step sets the default ending")
     check("2026-11-03 Salı (today), this week" in cal and "2026-11-06 Cuma, this week" in cal and "2026-11-13 Cuma, next week" in cal,
           "the calendar names today, this week's and next week's days in the call's language")
     res = generic.check(spec, tools, wf)
