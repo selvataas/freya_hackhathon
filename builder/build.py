@@ -92,6 +92,7 @@ def main():
         _, tools = openapi_tools.load(api_path, base=mock_url)
         trace.event("tools", names=sorted(tools))
         if not generic.fits_template(tools):
+            tools = generic.business_tools(tools)
             # a call the collections template does not fit: the generic path
             trace.event("path", mode="generic", about="the tool API lacks the collections template's tools; one dialogue step holds the API's operations")
             spec, info = generic.extract(briefs, api_text, tools, trace, use_cache=not a.no_cache, allow_llm=not a.no_llm)

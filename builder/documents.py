@@ -282,7 +282,8 @@ def is_openapi(path):
 
 CONTRACT_SYSTEM = ("You turn a bank's service contract into one OpenAPI 3 JSON document. Keep every operation, its path, method, "
                    "operationId (the service's own name), request fields with their types, allowed values and required flags, and "
-                   "the response fields of a success. Invent nothing that the contract does not say. Answer with the JSON only.")
+                   "the response fields of a success; a request wrapped in an envelope keeps its envelope as nested objects. Invent nothing "
+                   "that the contract does not say. Answer with the JSON only.")
 CONTRACT_WORDS = re.compile(r"contract|openapi|swagger|api|service|servis|hizmet|s[oö]zle[sş]me|endpoint", re.I)
 
 

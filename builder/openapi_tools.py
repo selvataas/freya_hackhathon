@@ -21,6 +21,9 @@ def _props(api, schema):
                 "required": name in (schema.get("required") or [])}
         if p.get("type") == "array":
             item["items"] = _props(api, p.get("items") or {})
+        elif p.get("properties"):
+            item["type"] = "object"
+            item["properties"] = _props(api, p)
         out[name] = item
     return out
 

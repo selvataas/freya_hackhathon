@@ -8,8 +8,16 @@ API's operations as tools. Nothing here knows a brief.
 import hashlib, json, pathlib, re, time
 
 CACHE = pathlib.Path(__file__).resolve().parent.parent / "cache"
-GENERIC_VERSION = "3"
+GENERIC_VERSION = "4"
 TEMPLATE_TOOLS = {"verify_identity", "get_account", "create_promise", "close_call"}
+
+
+AUTH = re.compile(r"oauth|/token\b|/auth\b|/login\b", re.I)
+
+
+def business_tools(tools):
+    """The API's operations without authentication ones (a token endpoint is the program's business, not the agent's)."""
+    return dict((n, t) for n, t in tools.items() if not AUTH.search(t.get("url") or "") and not AUTH.search(n))
 
 
 def fits_template(tools):
@@ -41,6 +49,10 @@ SCHEMA = {
         "start_tools": {"type": "array", "items": {"type": "string"},
                         "description": "Read-only lookups whose inputs all come from the call's variables and that the agent needs before "
                                        "anything else; the program runs them before the conversation starts. Never an operation that changes anything."},
+        "constant_fields": {"type": "array", "description": "Request fields that always carry the same value (a use-case code, a type code, a language): the program sends the value.",
+                            "items": {"type": "object", "required": ["tool", "field", "value"],
+                                      "properties": {"tool": {"type": "string"}, "field": {"type": "string", "description": "The field; a dotted path inside an envelope, e.g. data.kind"},
+                                                     "value": {"type": "string"}}}},
         "closing_line": {"type": "string", "description": "The sentence the program says to end the call when the customer has nothing else, in the call's language."},
         "end_lines": {"type": "array", "items": {"type": "string"},
                       "description": "Every sentence after which the call is over (the closing, every hand-over, ending on silence), word for word in the call's language."},
@@ -61,7 +73,11 @@ and a calendar of the coming days written from the call's date.
   so, and what to say when a tool fails. It must use the calendar it is given for every day and date.
 - "tools": every operation of the tool API, with its exact name. "when" is what the model reads to decide to call it.
   "fields_from_variables" lists request fields that the program fills from a call variable (for example an id the call
-  starts with); every other field the agent fills from the conversation.
+  starts with); "constant_fields" those that always carry the same value (a use-case code, a type code, a language;
+  an empty string when the documents give a field no value and the conversation cannot give one). A field inside an
+  envelope is named by its dotted path, e.g. "data.id". Every other field the agent fills from the conversation or
+  from an earlier tool answer; the instructions say from which.
+- Authentication (tokens) is the program's business: no tool and no instruction is about it.
 - "start_tools": the lookups the agent always needs first, when their inputs are all call variables (for example
   reading the caller's records by an id the call starts with). Their answers are in the agent's briefing from the
   first turn. Never list an operation that changes anything.
@@ -209,12 +225,45 @@ def _leaf(d, default):
     return leaf
 
 
-def _tool(t, entry, call_vars):
-    mapped = dict((m["field"], m["variable"]) for m in entry.get("fields_from_variables") or [] if m.get("field") and m.get("variable"))
-    props = {}
-    for f, d in t["fields"].items():
-        var = mapped.get(f) or (f if f in call_vars else None)
+def _body(fields, mapped, consts, call_vars, prefix=""):
+    """The request body's schema: nested objects keep their shape; a leaf gets a constant, a call variable, or a
+    placeholder of its own name that the model fills."""
+    props, req = {}, []
+    for f, d in fields.items():
+        path = prefix + f
+        if d.get("required"):
+            req.append(f)
+        if d.get("type") == "object" and d.get("properties"):
+            sub, sreq = _body(d["properties"], mapped, consts, call_vars, path + ".")
+            props[f] = {"type": "object", "properties": sub, "required": sreq}
+            continue
+        if path in consts or (f in consts and "." not in f):
+            props[f] = _leaf(d, consts.get(path, consts.get(f)))
+            continue
+        var = mapped.get(path) or mapped.get(f) or (f if f in call_vars else None)
         props[f] = _leaf(d, "{{" + (var or f) + "}}")
+    return props, req
+
+
+def _leaf_paths(fields, prefix=""):
+    out = []
+    for f, d in fields.items():
+        if d.get("type") == "object" and d.get("properties"):
+            out += [(p, r and d.get("required")) for p, r in _leaf_paths(d["properties"], prefix + f + ".")]
+        else:
+            out.append((prefix + f, bool(d.get("required"))))
+    return out
+
+
+def _consts(spec, name):
+    return dict((c["field"], c["value"]) for c in spec.get("constant_fields") or []
+                if isinstance(c, dict) and c.get("tool") == name and c.get("field") and c.get("value") is not None)
+
+
+def _tool(t, entry, call_vars, consts=None):
+    consts = consts or {}
+    mapped = dict((m["field"], m["variable"]) for m in entry.get("fields_from_variables") or [] if m.get("field") and m.get("variable"))
+    props, required = _body(t["fields"], mapped, consts, call_vars)
     url = t["url"]
     for p in t.get("params") or []:
         var = mapped.get(p["name"]) or (p["name"] if p["name"] in call_vars else p["name"])
@@ -225,7 +274,7 @@ def _tool(t, entry, call_vars):
     params = {"url": {"type": "string", "default": url}, "method": {"type": "string", "default": t["method"]},
               "headers": {"type": "object", "properties": {"Content-Type": {"type": "string", "default": "application/json"}}}}
     if t["method"] != "GET":
-        params["body"] = {"type": "object", "properties": props, "required": [f for f, d in t["fields"].items() if d.get("required")]}
+        params["body"] = {"type": "object", "properties": props, "required": required}
     when = (entry.get("when") or t.get("summary") or t["name"]).strip()
     return {"type": "function", "config": {"timeoutMs": 20000, "maxRetries": 1},
             "function": {"name": t["name"], "handler": "__function__:api_call",
@@ -233,11 +282,16 @@ def _tool(t, entry, call_vars):
                          "parameters": {"type": "object", "properties": params}}}
 
 
-def _all_from_variables(t, entry, call_vars):
-    """Every input of the operation comes from a call variable: the program can run it before the conversation."""
+def _all_from_variables(t, entry, call_vars, consts=None):
+    """Every required input of the operation comes from a call variable or a constant: the program can run it before
+    the conversation."""
+    consts = consts or {}
     mapped = dict((m["field"], m["variable"]) for m in entry.get("fields_from_variables") or [] if m.get("field") and m.get("variable"))
-    names = [f for f, d in t["fields"].items() if d.get("required")] + [p["name"] for p in t.get("params") or [] if p.get("required") or p["in"] == "path"]
-    return all((mapped.get(n) or (n if n in call_vars else None)) in call_vars for n in names)
+    names = [p for p, r in _leaf_paths(t["fields"]) if r] + [p["name"] for p in t.get("params") or [] if p.get("required") or p["in"] == "path"]
+    def ok(n):
+        leaf = n.split(".")[-1]
+        return n in consts or leaf in consts or (mapped.get(n) or mapped.get(leaf) or (leaf if leaf in call_vars else None)) in call_vars
+    return all(ok(n) for n in names)
 
 
 END_CODE = '''v = vars.get("end_the_call_args.line") or vars.get("line") or ""
@@ -282,7 +336,7 @@ def render(spec, tools):
     call_vars = set(v["name"] for v in variables)
     datevar = spec.get("date_variable") or ("now" if "now" in call_vars else "")
     entries = dict((e.get("name"), e) for e in spec.get("tools") or [] if isinstance(e, dict))
-    api_tools = [_tool(tools[n], entries.get(n) or {}, call_vars) for n in sorted(tools)]
+    api_tools = [_tool(tools[n], entries.get(n) or {}, call_vars, _consts(spec, n)) for n in sorted(tools)]
     var_lines = "\n".join(f"- {v['name']}: {v.get('meaning') or ''} (this call: {{{{{v['name']}}}}})" for v in variables)
     closing = (spec.get("closing_line") or "").strip()
     task = (spec.get("instructions") or "").strip() + "\n\n" + \
@@ -300,7 +354,7 @@ def render(spec, tools):
     cal = CALENDAR_CODE.replace("NAMES", json.dumps(names, ensure_ascii=False)).replace("DATEVAR", json.dumps(datevar or "now")) \
         .replace("CLOSING", json.dumps(closing or "."))
     import render as R
-    starts = [n for n in spec.get("start_tools") or [] if n in tools and _all_from_variables(tools[n], entries.get(n) or {}, call_vars)]
+    starts = [n for n in spec.get("start_tools") or [] if n in tools and _all_from_variables(tools[n], entries.get(n) or {}, call_vars, _consts(spec, n))]
     if starts:
         task += "\n\nLooked up for you when the call started (use these answers; call the tool again only when you need something new):\n" + \
             "\n".join(f"- {n}, one line per record:\n{{{{start_{n}_text}}}}" for n in starts)
@@ -331,7 +385,7 @@ def render(spec, tools):
     calendar["passthrough_default_transition"] = chain[0]
     calendar["transitions"] = [{"target_node": chain[0], "description": "always", "condition": {"operator": "always"}}]
     for i, n in enumerate(starts):
-        t = _tool(tools[n], entries.get(n) or {}, call_vars)
+        t = _tool(tools[n], entries.get(n) or {}, call_vars, _consts(spec, n))
         t.pop("config", None)
         nodes["start_" + n] = {"name": "start_" + n, "node_type": "api_request", "position": {"x": 100 + 50 * i, "y": 100}, "passthrough": True,
                                "passthrough_default_transition": chain[i + 1], "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
@@ -372,7 +426,8 @@ def check(spec, tools, wf):
                                                     for m in e.get("fields_from_variables") or [] if m.get("variable") not in call_vars])
     c("fields from variables name real request fields", [f"{e.get('name')}.{m.get('field')}" for e in spec.get("tools") or [] if e.get("name") in tools
                                                          for m in e.get("fields_from_variables") or []
-                                                         if m.get("field") not in tools[e["name"]]["fields"] and
+                                                         if m.get("field") not in [p for p, _ in _leaf_paths(tools[e["name"]]["fields"])] and
+                                                         m.get("field").split(".")[-1] not in [p.split(".")[-1] for p, _ in _leaf_paths(tools[e["name"]]["fields"])] and
                                                          m.get("field") not in [p["name"] for p in tools[e["name"]].get("params") or []]])
     c("an opening, a closing line and goodbye words", [k for k in ("opening", "closing_line") if not (spec.get(k) or "").strip()] +
       (["goodbye_words"] if not spec.get("goodbye_words") else []))
