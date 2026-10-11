@@ -3,7 +3,6 @@
  "hints": {
   "day_month_swapped": "day_month_swapped"
  },
- "new_call_after_idle_minutes": 15,
  "tools": {
   "verify_identity": {
    "role": "verify_identity",
@@ -144,5 +143,15 @@
     "promise_id": "promise_id"
    }
   }
- }
+ },
+ "conversation_fields": [
+  "call_id",
+  "session_id",
+  "conversation_id"
+ ],
+ "conversation_headers": [
+  "x-call-id",
+  "x-session-id",
+  "x-conversation-id"
+ ]
 }
