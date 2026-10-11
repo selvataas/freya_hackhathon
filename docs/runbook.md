@@ -46,6 +46,27 @@ python3 -c "import freya,json; w=json.load(open('.freya-agents.json'))['spike'][
 
 If it does not answer, the platform is down: wait and retry. Do not start a build on a dead platform (the build itself works, but the dry run and the save fail).
 
+**19:30 pre-check: no simulation may be running or stuck.** Our practice tests stop at 19:30 (none starts after 19:10).
+Then list the workspace's last simulations (one read, no new simulation):
+
+```bash
+python3 -c "
+import freya
+r = freya.api('GET', '/api/v2/simulations', limit=5)
+for s in (r.get('simulations') or r.get('data') or [])[:5]: print(s.get('id'), s.get('name'), s.get('status'), s.get('createdAt'), s.get('updatedAt'))
+"
+```
+
+Every one must be finished (`completed`, or another final status). A simulation still `running`, `pending` or `queued`
+blocks every new simulation of the workspace, and the bank sessions of a test that waits behind it expire ("the call
+is already closed"): on 11 October one stayed `running` for two hours after its run crashed on a 503. If one is open:
+
+- If it was started less than about 15 minutes ago, wait for it, checking every 5 minutes (not more often: the platform
+  is busy and every request adds to it).
+- If it has not moved for longer, or the list itself answers 503/504 for more than 15 minutes, tell the organisers
+  (the address in the kit email), with the simulation id, its status and since when. The builds do not need a
+  simulation, so go on with section 1 meanwhile.
+
 We keep the workspace at 10 workflows at most; the platform's limit is 200. Today: brief-a, brief-b, spike. Each final
 brief adds one (`hidden-1`, `hidden-2`).
 
