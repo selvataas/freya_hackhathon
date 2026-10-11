@@ -92,6 +92,13 @@ def main():
           f"reading order: BRIEF, README, the others by name, announcements and Q&A last: {names}")
     docs = documents.read([d], Trace())
     check(any(n == "akis.svg" and "Kimlik doğrulama" in t for n, t, _ in docs), "an SVG drawing is read as text")
+    for n in ("2026-10-09-decisions.txt", "2025-08-14-faq.md", "20260924-questions.txt", "note_2026_09_02.md", "c/2026-10-07-meeting.txt"):
+        (d / n).parent.mkdir(exist_ok=True)
+        (d / n).write_text(n)
+    names = [n for n, _ in documents.files_of([d])]
+    check(names == ["BRIEF.md", "readme.MD", "01-mail.md", "02-politika.md", "akis.svg", "sorumluluk.md", "2025-08-14-faq.md", "note_2026_09_02.md",
+                    "20260924-questions.txt", "c/2026-10-07-meeting.txt", "2026-10-09-decisions.txt", "Duyurular.md", "Sorular ve Cevaplar.md"],
+          f"dated documents by their date, whatever their kind, before the undated announcements and Q&A: {names}")
     shutil.rmtree(d)
 
     print("\nall passed" if ok else "\nSOME FAILED")

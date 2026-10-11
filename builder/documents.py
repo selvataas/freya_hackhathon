@@ -191,6 +191,26 @@ LATE_WORDS = ("announc", "duyuru", "faq", "sss", "qa", "question", "questions", 
               "cevap", "cevaplar", "sorucevap", "sorularcevaplar")
 
 
+DATE_IN_NAME = re.compile(r"(?<!\d)(19\d\d|20\d\d)[-_.]?(0[1-9]|1[0-2])[-_.]?(0[1-9]|[12]\d|3[01])(?!\d)")
+
+
+def name_date(path):
+    """The date a file name carries (YYYY-MM-DD, YYYY_MM_DD, YYYYMMDD), as 'YYYY-MM-DD', or ''."""
+    m = DATE_IN_NAME.search(pathlib.Path(path).name)
+    return "-".join(m.groups()) if m else ""
+
+
+def read_key(name, path):
+    """BRIEF first, README second, then the undated documents by name, then every dated document by its date (whatever
+    its kind), then undated announcements and questions-and-answers: a later text comes after the earlier one."""
+    rank, date = read_rank(path), name_date(path)
+    if rank in (0, 1):
+        return (rank, "", name)
+    if date:
+        return (3, date, name)
+    return (2 if rank == 2 else 4, "", name)
+
+
 def read_rank(path):
     """0 for BRIEF, 1 for README (any case, any extension), 3 for announcements and questions and answers, 2 else."""
     stem = pathlib.Path(path).stem.lower()
@@ -205,8 +225,7 @@ def read_rank(path):
 
 
 def files_of(paths):
-    """(name, path) of every file: a folder is read whole, sub-folders too: BRIEF first, README second, the others in
-    name order, announcements and questions and answers last."""
+    """(name, path) of every file: a folder is read whole, sub-folders too, in the order of read_key."""
     out = []
     for p in paths:
         p = pathlib.Path(p)
@@ -217,7 +236,7 @@ def files_of(paths):
                 if any(part.startswith(".") or part == "__MACOSX" for part in rel.parts):
                     continue
                 found.append((rel.as_posix(), f))
-            out += sorted(found, key=lambda x: (read_rank(x[1]), x[0]))
+            out += sorted(found, key=lambda x: read_key(x[0], x[1]))
         else:
             out.append((p.name, p))
     return out
