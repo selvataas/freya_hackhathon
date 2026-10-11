@@ -1,5 +1,5 @@
 {
-  "team": "",
+  "team": "Fides",
   "repo": "https://github.com/selvataas/freya_hackhathon",
   "commit": "",
   "run_command": "python3 builder/build.py {brief_path} {tool_api_path}",

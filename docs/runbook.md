@@ -217,7 +217,7 @@ Then fill `docs/submission-template.json` (copy it to `submission/submission.jso
 
 | Item | Value |
 |---|---|
-| Team name | `<TAKIM ADINIZ>` |
+| Team name | Fides |
 | Where to submit | Comes in the organisers' email with the submission steps (the kit email). |
 | Deadline | 20:00 UTC = 23:00 Istanbul, Sunday 11 October. Our target: everything sent by 22:00 Istanbul (19:00 UTC). |
 
@@ -236,8 +236,8 @@ rm /tmp/history.txt
 
    If anything is found: do not make the repo public. Rotate the key first, then rewrite the history.
 
-2. The last build commit is pushed. Fill `submission/submission.json` from the template: the team name and the commit
-   (`git rev-parse HEAD`). The repo, the run command and the paths are already in it. This file is the form's content;
+2. The last build commit is pushed. Fill `submission/submission.json` from the template: the commit
+   (`git rev-parse HEAD`). The team name, the repo, the run command and the paths are already in it. This file is the form's content;
    it is not committed, since it holds the commit's own id.
 3. Check that the submitted commit holds the four files the form points to:
 
@@ -286,7 +286,7 @@ The official form's fields, exactly as the hackathon page lists them. A copy is 
 
 ```json
 {
-  "team": "",
+  "team": "Fides",
   "repo": "https://github.com/selvataas/freya_hackhathon",
   "commit": "",
   "run_command": "python3 builder/build.py {brief_path} {tool_api_path}",
@@ -301,6 +301,6 @@ The official form's fields, exactly as the hackathon page lists them. A copy is 
 }
 ```
 
-- `team`: the team name. `commit`: the output of `git rev-parse HEAD` after the last push.
+- `team`: the team name, Fides. `commit`: the output of `git rev-parse HEAD` after the last push.
 - `run_command` is the page's command as it is. The organisers fill in the two paths.
 - `workflows` and `traces` point to files in the submitted commit; `git ls-files` must list all four.
