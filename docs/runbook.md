@@ -56,26 +56,29 @@ clarification into the builder's code or prompts**: like the briefs themselves, 
 nothing from them may go into the builder. A FAQ answer can change how we run the steps of this runbook, never what the
 builder contains.
 
-One folder per final brief under `final/`. The tool API file goes next to the brief, never inside a brief folder
-(a brief folder is read whole, every file as brief text).
+**Each final brief is one Markdown file**, with its own tool API file next to it (FAQ: "Each hidden brief is one Markdown
+file ... {brief_path} is that one file"). The raw-material brief too: its mail, policy extract, memo and code list are all
+in that one file. Save both files under the names of the page's example command, content unchanged:
 
 ```
-final/
-  <name1>/
-    <name1>.md            # a clean brief: one file
-    openapi.json          # that brief's tool API
-  <name2>/
-    <name2>/              # raw material: a folder of files (mail, policy, memo, code list), read in name order
-      01-....txt
-      ...
-    openapi.json
+briefs/
+  hidden-1.md               # the first final brief, one file
+  hidden-1.openapi.json     # its tool API
+  hidden-2.md
+  hidden-2.openapi.json
 ```
 
-- The slot (the workflow name) is the brief file name without extension, or the folder name. Pick names that do not
-  clash with `brief-a`, `brief-b` or `spike`, otherwise the build overwrites that workflow.
-- Raw material: name the files so that name order is reading order; a memo that changes the policy comes after it.
-  Do not edit the content.
+- The slot (the workflow name) is the brief file name without extension: `hidden-1`, `hidden-2`. Neither clashes with
+  `brief-a`, `brief-b` or `spike`.
+- Rename the files only; never edit the content.
+- In one file the order of the parts says nothing: a memo can stand before the policy it changes. The builder takes the
+  rule with the latest date (tested on `tests/variants/v4/brief-halden3.md`, a raw-material brief in one file).
 - If a final brief says it builds on another brief, pass both, in order (as `brief-a.md brief-b.md`).
+
+**Fallback, if a brief does arrive as several files:** put them in one folder `briefs/hidden-N/` and pass the folder; the
+builder reads every file in it in name order. Name the files so that name order is reading order (a memo after the
+policy it changes), do not edit the content, and keep the tool API file outside the folder (`briefs/hidden-N.openapi.json`):
+a brief folder is read whole, every file as brief text.
 
 ## 2. Build
 
@@ -86,14 +89,16 @@ then read from the brief in this run, and every model call that made it is in th
 has no model call in its trace, and the organisers' rerun has no cache. A build costs about $0.50 to $0.80 and takes 2 to
 3 minutes, well inside 30 minutes.
 
-The first final brief is `hidden-1`, the second `hidden-2`; these names are only for the submitted files, the slot stays
-the brief's name.
+The first final brief is `hidden-1`, the second `hidden-2`: the same name for the slot, the brief file and the submitted
+files.
 
 ```bash
 mkdir -p traces submission
-python3 builder/build.py --no-cache final/<name1>/<name1>.md final/<name1>/openapi.json 2>&1 | tee traces/hidden-1.log
-python3 builder/build.py --no-cache final/<name2>/<name2> final/<name2>/openapi.json 2>&1 | tee traces/hidden-2.log
+python3 builder/build.py --no-cache briefs/hidden-1.md briefs/hidden-1.openapi.json 2>&1 | tee traces/hidden-1.log
+python3 builder/build.py --no-cache briefs/hidden-2.md briefs/hidden-2.openapi.json 2>&1 | tee traces/hidden-2.log
 ```
+
+(Fallback for a brief that came as several files: `briefs/hidden-N` in place of `briefs/hidden-N.md`.)
 
 The last line is JSON: `{"slot", "workflow_id", "agent_id", "selftest", "warnings"}`. The builder's trace is the newest
 `traces/<time>-<slot>.jsonl`. Section 4 turns both into the two submitted trace files of each brief:
@@ -125,7 +130,7 @@ workspace; a ten-customer run took up to 8 minutes per run on a busy evening). S
 The checks read the builder's own trace of this run:
 
 ```bash
-T="$(ls -t traces/2*-<slot>.jsonl | head -1)"
+T="$(ls -t traces/2*-hidden-N.jsonl | head -1)"   # N = 1 or 2
 ```
 
 1. The last line has a `workflow_id` and an `agent_id`. A traceback means a crash: see section 5.
@@ -169,9 +174,9 @@ of the run whose trace we submit:
   `submission/hidden-N.workflow.json`.
 
 ```bash
-N=1; SLOT=<slot>          # N=2 for the second final brief
+N=1; SLOT=hidden-$N       # N=2 for the second final brief
 # run the build, then export at once
-python3 builder/build.py --no-cache final/<name>/<name>.md final/<name>/openapi.json 2>&1 | tee traces/hidden-$N.log
+python3 builder/build.py --no-cache briefs/hidden-$N.md briefs/hidden-$N.openapi.json 2>&1 | tee traces/hidden-$N.log
 python3 -c "import freya,json,sys; s=json.load(open('.freya-agents.json'))[sys.argv[1]]; print(freya.export_workflow(s['workflow_id'], sys.argv[2]))" $SLOT submission/hidden-$N.workflow.json
 T="$(ls -t traces/2*-$SLOT.jsonl | head -1)"
 cp "$T" traces/hidden-$N.jsonl
@@ -207,7 +212,7 @@ PUB-10; its leftover `firstMessage` is never spoken).
 ### Commit and hand in
 
 ```bash
-git add final submission traces/hidden-*.log traces/hidden-*.jsonl
+git add briefs/hidden-* submission traces/hidden-*.log traces/hidden-*.jsonl
 git commit -m "Final build: hidden-$N"
 git push
 git ls-files traces/hidden-1.log traces/hidden-1.jsonl traces/hidden-2.log traces/hidden-2.jsonl   # each submitted brief's two trace files must be listed
