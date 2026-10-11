@@ -260,7 +260,12 @@ def _consts(spec, name):
                 if isinstance(c, dict) and c.get("tool") == name and c.get("field") and c.get("value") is not None)
 
 
-def _tool(t, entry, call_vars, consts=None):
+def safe_name(name):
+    """A tool, node or variable name the platform and the model take: letters, digits and _ only."""
+    return re.sub(r"[^A-Za-z0-9_]", "_", name)
+
+
+def _tool(t, entry, call_vars, consts=None, name=None):
     consts = consts or {}
     mapped = dict((m["field"], m["variable"]) for m in entry.get("fields_from_variables") or [] if m.get("field") and m.get("variable"))
     props, required = _body(t["fields"], mapped, consts, call_vars)
@@ -277,7 +282,7 @@ def _tool(t, entry, call_vars, consts=None):
         params["body"] = {"type": "object", "properties": props, "required": required}
     when = (entry.get("when") or t.get("summary") or t["name"]).strip()
     return {"type": "function", "config": {"timeoutMs": 20000, "maxRetries": 1},
-            "function": {"name": t["name"], "handler": "__function__:api_call",
+            "function": {"name": name or safe_name(t["name"]), "handler": "__function__:api_call",
                          "description": when + " Call one tool per message, and speak to the customer after every tool answer.",
                          "parameters": {"type": "object", "properties": params}}}
 
@@ -336,10 +341,20 @@ def render(spec, tools):
     call_vars = set(v["name"] for v in variables)
     datevar = spec.get("date_variable") or ("now" if "now" in call_vars else "")
     entries = dict((e.get("name"), e) for e in spec.get("tools") or [] if isinstance(e, dict))
-    api_tools = [_tool(tools[n], entries.get(n) or {}, call_vars, _consts(spec, n)) for n in sorted(tools)]
+    safe = dict((n, safe_name(n)) for n in tools)
+    api_tools = [_tool(tools[n], entries.get(n) or {}, call_vars, _consts(spec, n), safe[n]) for n in sorted(tools)]
+
+    def renamed(text):
+        # the API's own names in the briefing, as the agent's tools are called
+        for n in sorted(tools, key=len, reverse=True):
+            if safe[n] != n:
+                text = text.replace(n, safe[n])
+        return text
+    for t in api_tools:
+        t["function"]["description"] = renamed(t["function"]["description"])
     var_lines = "\n".join(f"- {v['name']}: {v.get('meaning') or ''} (this call: {{{{{v['name']}}}}})" for v in variables)
     closing = (spec.get("closing_line") or "").strip()
-    task = (spec.get("instructions") or "").strip() + "\n\n" + \
+    task = renamed((spec.get("instructions") or "").strip()) + "\n\n" + \
         "The call's variables:\n" + var_lines + "\n\n" + \
         "Calendar of the days around the call (use it for every day and date; never work a date out yourself):\n{{calendar}}\n" + \
         "Unless the instructions say otherwise, a weekday the customer names without more is its first day after today in the " \
@@ -357,7 +372,7 @@ def render(spec, tools):
     starts = [n for n in spec.get("start_tools") or [] if n in tools and _all_from_variables(tools[n], entries.get(n) or {}, call_vars, _consts(spec, n))]
     if starts:
         task += "\n\nLooked up for you when the call started (use these answers; call the tool again only when you need something new):\n" + \
-            "\n".join(f"- {n}, one line per record:\n{{{{start_{n}_text}}}}" for n in starts)
+            "\n".join(f"- {safe[n]}, one line per record:\n{{{{start_{safe[n]}_text}}}}" for n in starts)
     ends = [x.strip() for x in spec.get("end_lines") or [] if isinstance(x, str) and x.strip()]
     task += ("\n\nTo end the call, call end_the_call with the ending sentence that fits; do not say it yourself, the program says it and "
              "hangs up. The ending sentences:\n" + "\n".join(f'- "{x}"' for x in ends) if ends else "") + \
@@ -381,18 +396,18 @@ def render(spec, tools):
     if "{{" in cal.replace("{{calendar}}", "") or "}}" in cal:
         raise ValueError("calendar code contains a double curly brace")
     nodes = {"calendar": calendar}
-    chain = ["start_" + n for n in starts] + (["facts"] if starts else []) + ["main"]
+    chain = ["start_" + safe[n] for n in starts] + (["facts"] if starts else []) + ["main"]
     calendar["passthrough_default_transition"] = chain[0]
     calendar["transitions"] = [{"target_node": chain[0], "description": "always", "condition": {"operator": "always"}}]
     for i, n in enumerate(starts):
-        t = _tool(tools[n], entries.get(n) or {}, call_vars, _consts(spec, n))
+        t = _tool(tools[n], entries.get(n) or {}, call_vars, _consts(spec, n), safe[n])
         t.pop("config", None)
-        nodes["start_" + n] = {"name": "start_" + n, "node_type": "api_request", "position": {"x": 100 + 50 * i, "y": 100}, "passthrough": True,
+        nodes["start_" + safe[n]] = {"name": "start_" + safe[n], "node_type": "api_request", "position": {"x": 100 + 50 * i, "y": 100}, "passthrough": True,
                                "passthrough_default_transition": chain[i + 1], "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
-                               "pre_actions": [t], "response_mapping": [{"path": "data", "variable": "start_" + n}],
+                               "pre_actions": [t], "response_mapping": [{"path": "data", "variable": "start_" + safe[n]}],
                                "transitions": [{"target_node": chain[i + 1], "description": "always", "condition": {"operator": "always"}}]}
     if starts:
-        code = FACTS_CODE.replace("NAMES", json.dumps(starts))
+        code = FACTS_CODE.replace("NAMES", json.dumps([safe[n] for n in starts]))
         nodes["facts"] = {"name": "facts", "node_type": "code", "position": {"x": 200, "y": 0}, "passthrough": True,
                           "passthrough_default_transition": "main", "on_enter": {"type": "silent"}, "disable_inactivity_monitor": True,
                           "pre_actions": [{"type": "function", "function": {"name": "code_exec", "handler": "__function__:code_exec",
@@ -417,7 +432,7 @@ def check(spec, tools, wf):
         out.append({"name": name, "pass": not problems, "problems": problems})
     main = wf["nodes"]["main"]
     names = [t["function"]["name"] for t in main["tools"]]
-    c("every operation of the tool API is a tool of the agent", [n for n in tools if n not in names])
+    c("every operation of the tool API is a tool of the agent", [n for n in tools if safe_name(n) not in names])
     c("every operation of the tool API has an entry in the spec", [n for n in tools if n not in [e.get("name") for e in spec.get("tools") or []]])
     c("every tool says when to call it", [e.get("name") for e in spec.get("tools") or [] if len((e.get("when") or "").strip()) < 15])
     c("the instructions name every tool", [n for n in tools if n not in (spec.get("instructions") or "")])
@@ -432,7 +447,7 @@ def check(spec, tools, wf):
     c("an opening, a closing line and goodbye words", [k for k in ("opening", "closing_line") if not (spec.get(k) or "").strip()] +
       (["goodbye_words"] if not spec.get("goodbye_words") else []))
     c("start lookups are operations whose inputs all come from call variables",
-      [n for n in spec.get("start_tools") or [] if n not in wf["nodes"].get("start_" + n, {}).get("name", "") ])
+      [n for n in spec.get("start_tools") or [] if "start_" + safe_name(n) not in wf["nodes"]])
     c("the date variable is a call variable", [] if not spec.get("date_variable") or spec["date_variable"] in call_vars else [spec["date_variable"]])
     unresolved = [v for v in re.findall(r"\{\{([A-Za-z_][A-Za-z0-9_.]*)\}\}", main["on_enter"].get("text") or "") if v not in call_vars]
     c("the opening uses only call variables", unresolved)

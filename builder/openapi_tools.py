@@ -1,5 +1,5 @@
 """Read the bank's tool API (OpenAPI) into plain tool descriptions. Nothing is typed by hand."""
-import json
+import json, urllib.parse
 
 
 def _resolve(api, node):
@@ -32,7 +32,14 @@ def load(path, base=None):
     """base, when given (the mock's address), replaces the server address of the API file."""
     api = json.load(open(path))
     servers = api.get("servers") or [{}]
-    base = (base or servers[0].get("url") or "").rstrip("/")
+    srv = (servers[0].get("url") or "").rstrip("/")
+    if base:
+        # the mock answers on the same paths as the API: keep the server address's own path (e.g. /v1) under it
+        spath = urllib.parse.urlparse(srv).path.rstrip("/") if "://" in srv else srv
+        base = base.rstrip("/")
+        base = base if not spath or base.endswith(spath) else base + spath
+    else:
+        base = srv
     tools = {}
     for path_, ops in (api.get("paths") or {}).items():
         for method, op in ops.items():
