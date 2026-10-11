@@ -83,6 +83,17 @@ def main():
     check(c.name == "servis.json" and any(e["event"] == "contract" for e in tr.events), "the service contract is the folder's OpenAPI JSON")
     shutil.rmtree(d)
 
+    # the reading order: BRIEF first, README second, the others in name order, announcements and Q&A last
+    d = pathlib.Path(tempfile.mkdtemp(prefix="docs-order-"))
+    for n in ("01-mail.md", "Duyurular.md", "readme.MD", "BRIEF.md", "Sorular ve Cevaplar.md", "02-politika.md", "sorumluluk.md", "akis.svg"):
+        (d / n).write_text("<svg><text>Kimlik doğrulama</text></svg>" if n.endswith(".svg") else n)
+    names = [n for n, _ in documents.files_of([d])]
+    check(names == ["BRIEF.md", "readme.MD", "01-mail.md", "02-politika.md", "akis.svg", "sorumluluk.md", "Duyurular.md", "Sorular ve Cevaplar.md"],
+          f"reading order: BRIEF, README, the others by name, announcements and Q&A last: {names}")
+    docs = documents.read([d], Trace())
+    check(any(n == "akis.svg" and "Kimlik doğrulama" in t for n, t, _ in docs), "an SVG drawing is read as text")
+    shutil.rmtree(d)
+
     print("\nall passed" if ok else "\nSOME FAILED")
     sys.exit(0 if ok else 1)
 

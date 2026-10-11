@@ -1,14 +1,16 @@
 """A case's documents as text, and its service contract as an OpenAPI document. Nothing here knows a brief.
 
-Markdown and other text files are read as they are; Word (.docx) and Excel (.xlsx) with the standard library (Excel
-dates become YYYY-MM-DD); a PDF is given to the model, which writes out its text (cached by the file's hash). The
+Markdown and other text files (an SVG drawing too) are read as they are; Word (.docx) and Excel (.xlsx) with the standard
+library (Excel dates become YYYY-MM-DD); a PDF or an image (PNG, JPEG, GIF, WebP) is given to the model, which writes out
+its text (cached by the file's hash). BRIEF is read first, README second, announcements and questions and answers last. The
 service contract is the folder's OpenAPI JSON; without one, the model writes it from the contract documents.
 """
 import base64, datetime, hashlib, json, pathlib, re, zipfile
 import xml.etree.ElementTree as ET
 
 CACHE = pathlib.Path(__file__).resolve().parent.parent / "cache"
-TEXT = {".md", ".markdown", ".txt", ".csv", ".tsv", ".json", ".yaml", ".yml", ".xml", ".html", ".htm"}
+TEXT = {".md", ".markdown", ".txt", ".csv", ".tsv", ".json", ".yaml", ".yml", ".xml", ".html", ".htm", ".svg", ".mmd"}
+IMAGES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 X = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
@@ -153,19 +155,68 @@ def pdf_text(path, trace, allow_llm=True):
     return text
 
 
+IMAGE_SYSTEM = ("You write out a drawing from a bank's documents (for example a process flow) as text, in the drawing's own "
+                "language: every box, decision and label word for word, and every arrow as 'from -> to' with its label, as a "
+                "numbered Markdown list in the order of the flow. Add nothing, translate nothing, comment on nothing.")
+
+
+def image_text(path, trace, allow_llm=True):
+    """A drawing, written out as text by the model (cached by the file's hash)."""
+    data = pathlib.Path(path).read_bytes()
+    key = hashlib.sha256(data).hexdigest()[:16]
+    cp = CACHE / f"image-{key}.md"
+    if cp.exists():
+        trace.event("image_cache_hit", file=pathlib.Path(path).name, key=key)
+        return cp.read_text()
+    if not allow_llm:
+        raise SystemExit(f"--no-llm: the image {pathlib.Path(path).name} has not been read yet (key {key}); nothing was called")
+    if len(data) > 3_700_000:
+        raise ValueError("the image is larger than the model accepts (about 3.7 MB before encoding)")
+    import extract
+    media = IMAGES[pathlib.Path(path).suffix.lower()]
+    content = [{"type": "image", "source": {"type": "base64", "media_type": media, "data": base64.b64encode(data).decode()}},
+               {"type": "text", "text": "Write out this drawing as text."}]
+    text = extract._ask(trace, f"read the drawing {pathlib.Path(path).name}", IMAGE_SYSTEM, [{"role": "user", "content": content}])
+    CACHE.mkdir(exist_ok=True)
+    cp.write_text(text)
+    return text
+
+
 # ---------------------------------------------------------------- the case
 
+# words in a file name that mark announcements and questions-and-answers: read last, so that a later text that changes
+# an earlier one comes after it (the builder's own words, in English and Turkish)
+LATE_WORDS = ("announc", "duyuru", "faq", "sss", "qa", "question", "questions", "answer", "answers", "soru", "sorular",
+              "cevap", "cevaplar", "sorucevap", "sorularcevaplar")
+
+
+def read_rank(path):
+    """0 for BRIEF, 1 for README (any case, any extension), 3 for announcements and questions and answers, 2 else."""
+    stem = pathlib.Path(path).stem.lower()
+    if stem == "brief":
+        return 0
+    if stem == "readme":
+        return 1
+    tokens = [t for t in re.split(r"[^0-9a-zçğıöşü]+", stem) if t] + [re.sub(r"[^0-9a-zçğıöşü]", "", stem)]
+    if any(t == w or (len(w) > 4 and t.startswith(w)) for t in tokens for w in LATE_WORDS):
+        return 3
+    return 2
+
+
 def files_of(paths):
-    """(name, path) of every file: a folder is read whole, sub-folders too, in name order."""
+    """(name, path) of every file: a folder is read whole, sub-folders too: BRIEF first, README second, the others in
+    name order, announcements and questions and answers last."""
     out = []
     for p in paths:
         p = pathlib.Path(p)
         if p.is_dir():
+            found = []
             for f in sorted(x for x in p.rglob("*") if x.is_file()):
                 rel = f.relative_to(p)
                 if any(part.startswith(".") or part == "__MACOSX" for part in rel.parts):
                     continue
-                out.append((rel.as_posix(), f))
+                found.append((rel.as_posix(), f))
+            out += sorted(found, key=lambda x: (read_rank(x[1]), x[0]))
         else:
             out.append((p.name, p))
     return out
@@ -185,6 +236,8 @@ def read(paths, trace, allow_llm=True):
                 docs.append((name, xlsx_text(f), f))
             elif ext == ".pdf":
                 docs.append((name, pdf_text(f, trace, allow_llm), f))
+            elif ext in IMAGES:
+                docs.append((name, image_text(f, trace, allow_llm), f))
             else:
                 skipped.append({"file": name, "why": "a file type the builder does not read"})
         except SystemExit:
