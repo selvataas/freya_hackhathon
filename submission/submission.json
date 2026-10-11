@@ -7,7 +7,7 @@
   }
  ],
  "repo": "https://github.com/selvataas/freya_hackhathon",
- "commit": "c92e28060f7b6190a2163933eed90c990d545164",
+ "commit": "12219f257ab0164b1e12d739a3d561a0c42c3370",
  "run_command": "python3 builder/build.py {case_folder} {mock_url}",
  "workflow": "submission/final.workflow.json",
  "trace": "traces/final.log",
