@@ -51,6 +51,13 @@ def main():
     check(env["vars"]["ending"] == spec["closing_line"] and env["vars"]["end_now"] == "no", "the calendar step sets the default ending")
     check("2026-11-03 Salı (today), this week" in cal and "2026-11-06 Cuma, this week" in cal and "2026-11-13 Cuma, next week" in cal,
           "the calendar names today, this week's and next week's days in the call's language")
+    lined = dict(spec, end_lines=["Transferring you now."])
+    end = next(t for t in generic.render(lined, tools)["nodes"]["main"]["tools"] if t["function"]["name"] == "end_the_call")
+    end = end["function"]["parameters"]["properties"]["code"]["default"]
+    eenv = {"vars": dict(env["vars"]), "params": {"line": "Transferring you now.", "say_before": "Done."}}
+    exec(end, eenv)
+    check(eenv["vars"]["ending"] == "Done. Transferring you now." and eenv["vars"]["end_now"] == "yes" and "{{" not in end and "}}" not in end,
+          "the ending tool reads its arguments from params: what must still be said, then the chosen ending")
     res = generic.check(spec, tools, wf)
     check(all(r["pass"] for r in res), f"the generic checks: {sum(r['pass'] for r in res)}/{len(res)}")
     bad = dict(spec, tools=[t for t in spec["tools"] if t["name"] != "free_slots"])

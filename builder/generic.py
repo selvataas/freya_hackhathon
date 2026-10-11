@@ -299,8 +299,12 @@ def _all_from_variables(t, entry, call_vars, consts=None):
     return all(ok(n) for n in names)
 
 
-END_CODE = '''v = str(vars.get("end_the_call_args.line") or vars.get("line") or "").strip()
-b = str(vars.get("end_the_call_args.say_before") or vars.get("say_before") or "").strip()
+# the engine hands a code tool's arguments to its code as the global dict `params` (measured on the platform)
+END_CODE = '''p = globals().get("params")
+if not isinstance(p, dict):
+    p = dict()
+v = str(p.get("line") or vars.get("end_the_call_args.line") or vars.get("line") or "").strip()
+b = str(p.get("say_before") or vars.get("end_the_call_args.say_before") or vars.get("say_before") or "").strip()
 if b.startswith("{" + "{"):
     b = ""
 if v.startswith("{" + "{"):
