@@ -47,10 +47,55 @@ grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/final.log
     or written by the model), `model_call`s, `selftest` n/n, `dry_run`, `saved`, `end`, `git_dirty: false`. Read
     `out/$SLOT.spec.json`: `language` is `tr`, the phrases are Turkish, the outcome table and the tool fields match
     the contract. The export check of section 4 works with `submission/final.workflow.json` and `traces/final.jsonl`.
-F4. **Commit and send**: `git add case submission traces/final.log traces/final.jsonl`, commit, push. Fill
-    `submission/submission.json` from `docs/submission-template.json` (`commit` = `git rev-parse HEAD`), make the
-    repository public (section 4), and send the file to the address in the kit email before 23:00 Istanbul.
-    Optional: the Claude Code session logs of building the builder may be shared too.
+F4. **Commit and send.** The page: "Before 20:00 UTC (23:00 Istanbul), e-mail three files to `yavuz@freyavoice.ai`:
+    `submission.json`, the exported workflow and the trace. Keep the same files in your repo at the commit you name."
+    The three files are `submission/submission.json`, `submission/final.workflow.json` and `traces/final.log`.
+    `submission.json` names a commit, so it cannot be inside that commit: the named commit holds the case, the exported
+    workflow and the trace; `submission.json` follows in the next commit, on its own. Our target: sent by 22:30.
+
+```bash
+grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/final.log traces/final.jsonl submission/final.workflow.json   # every count must be 0
+git add case submission/final.workflow.json traces/final.log traces/final.jsonl
+git commit -m "Final build: the case, the exported workflow and the trace" && git push
+C="$(git rev-parse HEAD)"                                   # the commit we name
+python3 - "$C" <<'PY'
+import json, sys
+t = json.load(open("docs/submission-template.json")); t["commit"] = sys.argv[1]
+json.dump(t, open("submission/submission.json", "w"), indent=1, ensure_ascii=False); print(json.dumps(t, indent=1, ensure_ascii=False))
+PY
+git add submission/submission.json && git commit -m "submission.json for commit ${C:0:7}" && git push
+git ls-tree -r --name-only "$C" submission/final.workflow.json traces/final.log   # both listed at the named commit
+```
+
+    Make the repository public (section 4, hand-in checklist steps 1, 4 and 5: key scan of the whole history first).
+    Then send one e-mail to `yavuz@freyavoice.ai` with the three files attached
+    (`submission/submission.json`, `submission/final.workflow.json`, `traces/final.log`), subject and body below, with
+    the commit filled in. Optional: the Claude Code session logs of building the builder may be shared too.
+
+```text
+Subject: Fides – Build the Builder final submission
+
+Hello,
+
+Attached is our final submission for Build the Builder: submission.json, the exported workflow
+(final.workflow.json) and the trace of the builder run that made it (final.log).
+
+Team: Fides (Selva Taş, selvataas@gmail.com)
+Repository: https://github.com/selvataas/freya_hackhathon
+Commit: <commit>
+  The exported workflow and the trace are at that commit: submission/final.workflow.json and traces/final.log.
+  submission.json names that commit, so it is in the commit right after it.
+Mock: https://fides-mock.fides-freya.workers.dev (Cloudflare Workers; it stays up until the results are out)
+Run command: python3 builder/build.py {case_folder} {mock_url}
+
+To run the builder: Python 3.9 or newer, no packages needed, and these environment variables:
+  ANTHROPIC_API_KEY  for the builder's model calls (reading the documents and the spec)
+  FREYA_API_KEY      for the Freya workspace where the phone agent is created
+  FREYA_API_URL      the Freya API address (the staging address of the kit's env.example)
+
+Thank you,
+Selva Taş – team Fides
+```
 
 Ground rules from the README and CLAUDE.md:
 
