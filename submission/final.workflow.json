@@ -1,7 +1,7 @@
 {
  "workflow_id": "37272c92-a15d-4d12-a1b7-690791fe62cd",
  "agent_id": "9febff3b-372d-4ceb-88fe-7c566a406775",
- "updated_at": "2026-10-11T18:45:34.763Z",
+ "updated_at": "2026-10-11T18:52:42.646Z",
  "workflow": {
   "nodes": {
    "bye": {
@@ -626,7 +626,7 @@
         "properties": {
          "code": {
           "type": "string",
-          "default": "v = str(vars.get(\"end_the_call_args.line\") or vars.get(\"line\") or \"\").strip()\nb = str(vars.get(\"end_the_call_args.say_before\") or vars.get(\"say_before\") or \"\").strip()\nif b.startswith(\"{\" + \"{\"):\n    b = \"\"\nif v.startswith(\"{\" + \"{\"):\n    v = \"\"\nif v:\n    vars[\"ending\"] = v\nif b and b not in str(vars.get(\"ending\") or \"\"):\n    vars[\"ending\"] = b + \" \" + str(vars.get(\"ending\") or \"\")\nvars[\"end_now\"] = \"yes\"\n"
+          "default": "p = globals().get(\"params\")\nif not isinstance(p, dict):\n    p = dict()\nv = str(p.get(\"line\") or vars.get(\"end_the_call_args.line\") or vars.get(\"line\") or \"\").strip()\nb = str(p.get(\"say_before\") or vars.get(\"end_the_call_args.say_before\") or vars.get(\"say_before\") or \"\").strip()\nif b.startswith(\"{\" + \"{\"):\n    b = \"\"\nif v.startswith(\"{\" + \"{\"):\n    v = \"\"\nif v:\n    vars[\"ending\"] = v\nif b and b not in str(vars.get(\"ending\") or \"\"):\n    vars[\"ending\"] = b + \" \" + str(vars.get(\"ending\") or \"\")\nvars[\"end_now\"] = \"yes\"\n"
          },
          "line": {
           "enum": [
