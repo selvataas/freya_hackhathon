@@ -1,0 +1,15 @@
+{
+ "about": "Each service of the test data, the HTTP method and paths it answers on, and the request field names it reads. The paths are provisional until the bank's integration document (section 6) arrives.",
+ "customer_fields": ["customerNo", "customerNumber", "customer_no", "musteriNo"],
+ "card_fields": ["cardNumber", "card_number", "maskedCardNumber", "kartNo"],
+ "week_fields": ["newStatementWeek", "statementWeek", "week", "hafta"],
+ "services": {
+  "cards.list": {"method": "POST", "paths": ["/cards/list", "/cards.list"]},
+  "cards.balance": {"method": "POST", "paths": ["/cards/balance", "/cards.balance"]},
+  "statement.week.get": {"method": "POST", "paths": ["/statement/week/get", "/statement.week.get"]},
+  "statement.week.decide": {"method": "POST", "paths": ["/statement/week/decide", "/statement.week.decide"]},
+  "statement.week.change": {"method": "POST", "paths": ["/statement/week/change", "/statement.week.change"]},
+  "contact.email.get": {"method": "POST", "paths": ["/contact/email/get", "/contact.email.get"]},
+  "statement.pdf.send": {"method": "POST", "paths": ["/statement/pdf/send", "/statement.pdf.send"]}
+ }
+}
