@@ -1,0 +1,148 @@
+{
+ "max_wrong_total": 3,
+ "hints": {
+  "day_month_swapped": "day_month_swapped"
+ },
+ "new_call_after_idle_minutes": 15,
+ "tools": {
+  "verify_identity": {
+   "role": "verify_identity",
+   "path": "/verify_identity",
+   "fields": {
+    "customer_id": "customer_id",
+    "field": "field",
+    "answer": "answer"
+   },
+   "response": {
+    "ok": "ok",
+    "error": "error",
+    "verified": "verified",
+    "wrong_answers_left": "wrong_answers_left",
+    "all_verified": "all_verified",
+    "hint": "hint",
+    "products": "products",
+    "product_id": "product_id",
+    "promise_id": "promise_id"
+   }
+  },
+  "get_account": {
+   "role": "get_account",
+   "path": "/get_account",
+   "fields": {
+    "customer_id": "customer_id"
+   },
+   "response": {
+    "ok": "ok",
+    "error": "error",
+    "verified": "verified",
+    "wrong_answers_left": "wrong_answers_left",
+    "all_verified": "all_verified",
+    "hint": "hint",
+    "products": "products",
+    "product_id": "product_id",
+    "promise_id": "promise_id"
+   }
+  },
+  "create_promise": {
+   "role": "create_promise",
+   "path": "/create_promise",
+   "fields": {
+    "customer_id": "customer_id",
+    "product_id": "product_id",
+    "amount": "amount",
+    "date": "date"
+   },
+   "response": {
+    "ok": "ok",
+    "error": "error",
+    "verified": "verified",
+    "wrong_answers_left": "wrong_answers_left",
+    "all_verified": "all_verified",
+    "hint": "hint",
+    "products": "products",
+    "product_id": "product_id",
+    "promise_id": "promise_id"
+   }
+  },
+  "add_note": {
+   "role": "add_note",
+   "path": "/add_note",
+   "fields": {
+    "customer_id": "customer_id",
+    "product_id": "product_id",
+    "reason": "reason",
+    "text": "text"
+   },
+   "response": {
+    "ok": "ok",
+    "error": "error",
+    "verified": "verified",
+    "wrong_answers_left": "wrong_answers_left",
+    "all_verified": "all_verified",
+    "hint": "hint",
+    "products": "products",
+    "product_id": "product_id",
+    "promise_id": "promise_id"
+   }
+  },
+  "schedule_callback": {
+   "role": "schedule_callback",
+   "path": "/schedule_callback",
+   "fields": {
+    "customer_id": "customer_id",
+    "date": "date",
+    "time": "time"
+   },
+   "response": {
+    "ok": "ok",
+    "error": "error",
+    "verified": "verified",
+    "wrong_answers_left": "wrong_answers_left",
+    "all_verified": "all_verified",
+    "hint": "hint",
+    "products": "products",
+    "product_id": "product_id",
+    "promise_id": "promise_id"
+   }
+  },
+  "transfer_to_agent": {
+   "role": "transfer_to_agent",
+   "path": "/transfer_to_agent",
+   "fields": {
+    "customer_id": "customer_id",
+    "queue": "queue"
+   },
+   "response": {
+    "ok": "ok",
+    "error": "error",
+    "verified": "verified",
+    "wrong_answers_left": "wrong_answers_left",
+    "all_verified": "all_verified",
+    "hint": "hint",
+    "products": "products",
+    "product_id": "product_id",
+    "promise_id": "promise_id"
+   }
+  },
+  "close_call": {
+   "role": "close_call",
+   "path": "/close_call",
+   "fields": {
+    "customer_id": "customer_id",
+    "outcome": "outcome",
+    "reason": "reason"
+   },
+   "response": {
+    "ok": "ok",
+    "error": "error",
+    "verified": "verified",
+    "wrong_answers_left": "wrong_answers_left",
+    "all_verified": "all_verified",
+    "hint": "hint",
+    "products": "products",
+    "product_id": "product_id",
+    "promise_id": "promise_id"
+   }
+  }
+ }
+}

@@ -10,3 +10,5 @@ traces/*
 !traces/hidden-*.log
 !traces/hidden-*.jsonl
 .freya-agents.json
+mock/.wrangler/
+mock/node_modules/

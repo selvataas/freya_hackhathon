@@ -1,0 +1,13 @@
+# The mock of the bank's services, on Cloudflare Workers. data/config.json names the operations and their fields,
+# data/customers.json holds the test customers. One Durable Object per customer keeps that customer's ledger.
+name = "fides-mock"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+
+[[durable_objects.bindings]]
+name = "LEDGER"
+class_name = "Ledger"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Ledger"]
