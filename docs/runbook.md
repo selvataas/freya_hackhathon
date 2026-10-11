@@ -79,6 +79,7 @@ Use plain `python3`, Opus, `--no-cache`, no `--no-llm`, and keep the console out
 then read from the brief in this run, and every model call that made it is in this run's trace. A build from the cache
 has no model call in its trace, and the organisers' rerun has no cache. A build costs about $0.50 to $0.80 and takes 2 to
 3 minutes, well inside 30 minutes.
+
 The first final brief is `hidden-1`, the second `hidden-2`; these names are only for the submitted files, the slot stays
 the brief's name.
 
@@ -112,6 +113,12 @@ workspace; a ten-customer run took up to 8 minutes per run on a busy evening). S
 
 ## 3. Checks after each build
 
+The checks read the builder's own trace of this run:
+
+```bash
+T="$(ls -t traces/2*-<slot>.jsonl | head -1)"
+```
+
 1. The last line has a `workflow_id` and an `agent_id`. A traceback means a crash: see section 5.
 2. `selftest` is `n/n`. A failed scenario is listed in the trace (`event: selftest`); read it before going on.
 3. `warnings`: every warning is in the trace (`event: warning`). Most are harmless (an unknown value fell back to a safe
@@ -123,8 +130,8 @@ workspace; a ten-customer run took up to 8 minutes per run on a busy evening). S
    `client_` event:
 
 ```bash
-grep -c '"event": "client_' traces/hidden-N.jsonl   # must be 0
-grep -c 'ask_client disabled' traces/hidden-N.jsonl  # 0; 1 means CLIENT_MODE was set: the layer did not run, unset it anyway
+grep -c '"event": "client_' "$T"   # must be 0
+grep -c 'ask_client disabled' "$T"  # 0; 1 means CLIENT_MODE was set: the layer did not run, unset it anyway
 ```
 
    The builder also guards this itself: with a local answer file and no `--test`, it refuses to run the layer and
@@ -136,7 +143,7 @@ grep -c 'ask_client disabled' traces/hidden-N.jsonl  # 0; 1 means CLIENT_MODE wa
 7. No key in the trace or the log:
 
 ```bash
-grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/2*-<slot>.jsonl traces/hidden-N.log traces/hidden-N.jsonl   # every count must be 0
+grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " "$T" traces/hidden-N.log   # every count must be 0
 ```
 
 8. Optional, if time is left: one chat turn against the new workflow to see the opening line (a chat skips the first code
@@ -160,6 +167,7 @@ python3 -c "import freya,json,sys; s=json.load(open('.freya-agents.json'))[sys.a
 T="$(ls -t traces/2*-$SLOT.jsonl | head -1)"
 cp "$T" traces/hidden-$N.jsonl
 cat "$T" >> traces/hidden-$N.log          # the official trace: console output, then the whole trace
+grep -E -c "fak_[A-Za-z0-9]{6,}|sk-ant-[A-Za-z0-9]{6,}|Bearer " traces/hidden-$N.log traces/hidden-$N.jsonl   # every count must be 0
 
 # the export is this run's workflow: every field of the build output is in it, and the ids match the trace
 python3 - $N $SLOT <<'PY'
