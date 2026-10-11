@@ -37,19 +37,31 @@ export default {
     for (const [role, field] of Object.entries(tool.fields || {})) if (body[field] !== undefined) args[role] = body[field];
     const id = String(args.customer_id ?? "");
     const cust = CUSTOMERS[id];
-    const result = cust ? handle(tool.role || tool.name, args, cust) : { ok: false, error: "unknown customer_id" };
     const headers = {};
     for (const [k, v] of request.headers) if (!SECRET.test(k)) headers[k] = v;
-    const conv = (config.conversation_fields || []).map((f) => body[f]).find((x) => x !== undefined && x !== "")
-      ?? (config.conversation_headers || []).map((h) => request.headers.get(h)).find((x) => x) ?? null;
-    if (cust) {
-      await env.LEDGER.get(env.LEDGER.idFromName(id)).fetch("https://ledger/append", {
-        method: "POST", body: JSON.stringify({ at: new Date().toISOString(), tool: tool.name, conversation: conv, args: body, result, headers }),
+    const conv = conversationOf(request, body);
+    const role = tool.role || tool.name;
+    let result;
+    if (!cust) result = { ok: false, error: "unknown customer_id" };
+    else {
+      // the customer's Durable Object appends the call to the ledger; for an identity answer it also keeps what this
+      // conversation has verified, so that all_verified and wrong_answers_left are right for this conversation only
+      const r = await env.LEDGER.get(env.LEDGER.idFromName(id)).fetch("https://ledger/call", {
+        method: "POST", body: JSON.stringify({ at: new Date().toISOString(), tool: tool.name, role, conversation: conv, args, raw: body, headers }),
       });
+      result = await r.json();
     }
     return json(out(tool, result));
   },
 };
+
+// the conversation a request belongs to: a field or a header the contract names, else the platform's sentry-trace id
+function conversationOf(request, body) {
+  for (const f of config.conversation_fields || []) if (body[f] !== undefined && body[f] !== "") return String(body[f]);
+  for (const h of config.conversation_headers || []) { const v = request.headers.get(h); if (v) return v; }
+  const st = request.headers.get("sentry-trace");
+  return st ? "trace:" + st.split("-")[0] : null;
+}
 
 // response roles -> the contract's field names
 function out(tool, result) {
@@ -62,7 +74,9 @@ function out(tool, result) {
 const norm = (x) => String(x ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 let counter = 0;
 
-function handle(role, a, cust) {
+// conv: this conversation's {verified: [fields], wrong: n}, or null when the request names no conversation (then
+// all_verified stays false and wrong_answers_left at the limit: an agent counts for itself)
+function handle(role, a, cust, conv) {
   const fields = Object.keys(cust.identity || {});
   const maxWrong = config.max_wrong_total || 3;
   switch (role) {
@@ -71,11 +85,12 @@ function handle(role, a, cust) {
       if (want === undefined) return { ok: false, error: "unknown field " + field };
       const answer = String(a.answer ?? "").trim();
       const right = norm(answer) === norm(want);
+      const left = () => (conv ? Math.max(0, maxWrong - conv.wrong) : maxWrong);
       const hint = config.hints && config.hints.day_month_swapped;
       if (!right && hint && /^\d{4}-\d{2}-\d{2}$/.test(want) && answer === want.slice(0, 5) + want.slice(8, 10) + "-" + want.slice(5, 7) && want.slice(5, 7) !== want.slice(8, 10))
-        return { ok: true, verified: false, hint, wrong_answers_left: maxWrong, all_verified: false };
-      // no state: all_verified when the last of the customer's questions is answered right
-      return { ok: true, verified: right, wrong_answers_left: maxWrong, all_verified: right && field === fields[fields.length - 1] };
+        return { ok: true, verified: false, hint, wrong_answers_left: left(), all_verified: false };
+      if (conv) { if (right) { if (!conv.verified.includes(field)) conv.verified.push(field); } else conv.wrong += 1; }
+      return { ok: true, verified: right, wrong_answers_left: left(), all_verified: !!conv && fields.every((f) => conv.verified.includes(f)) };
     }
     case "get_account":
       return { ok: true, products: cust.products };
@@ -93,11 +108,16 @@ export class Ledger {
   async fetch(request) {
     const url = new URL(request.url);
     let calls = (await this.storage.get("calls")) || [];
-    if (url.pathname === "/append") {
-      calls.push(await request.json());
+    if (url.pathname === "/call") {
+      const c = await request.json();
+      const convs = (await this.storage.get("conversations")) || {};
+      const conv = c.conversation ? (convs[c.conversation] ||= { verified: [], wrong: 0, started: c.at }) : null;
+      const result = handle(c.role, c.args, CUSTOMERS[String(c.args.customer_id)], conv);
+      calls.push({ at: c.at, tool: c.tool, conversation: c.conversation, args: c.raw, result, headers: c.headers });
       calls = calls.slice(-500);
-      await this.storage.put("calls", calls);
-      return json({ ok: true });
+      const keep = Object.entries(convs).sort((x, y) => String(y[1].started).localeCompare(String(x[1].started))).slice(0, 200);
+      await this.storage.put({ calls, conversations: Object.fromEntries(keep) });
+      return json(result);
     }
     return json({ calls });
   }
